@@ -6,7 +6,13 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
-  /* здесь будут опции сборки; пока пусто */
+  images: {
+    // Разрешаем next/image отдавать SVG — используется для локальных
+    // плейсхолдеров в /public/placeholders. Источник доверенный (наш репозиторий).
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
 };
 
 export default withNextIntl(nextConfig);

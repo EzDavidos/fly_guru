@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="FlyGuru placeholder">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e8a9e"/>
+      <stop offset="0.55" stop-color="#3fb6c4"/>
+      <stop offset="1" stop-color="#cfe9ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#g)"/>
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="6">
+    <path d="M0 620 C 260 560, 420 700, 700 640 S 1180 560, 1600 640"/>
+    <path d="M0 720 C 280 660, 460 800, 740 740 S 1220 660, 1600 740"/>
+  </g>
+  <g fill="#ffffff" fill-opacity="0.9" font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="800" y="430" font-size="72" font-weight="700">FlyGuru</text>
+    <text x="800" y="490" font-size="30" fill-opacity="0.85">фото — заменить</text>
+  </g>
+</svg>

@@ -1,26 +1,31 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ── Дизайн-токены FlyGuru — палитра «Sunrise Sea» ──────────────────────────
+   Все цвета проекта заданы здесь. Смена палитры = правка этих значений,
+   переверстка не нужна. Tailwind v4 генерит из них утилиты: bg-primary,
+   text-ink, border-line и т.д. */
+@theme {
+  --color-bg: #f7fafc; /* фон страницы */
+  --color-surface: #ffffff; /* карточки, шапка */
+  --color-surface-2: #eef4f7; /* второстепенные плашки */
+  --color-primary: #0e8a9e; /* морская бирюза */
+  --color-primary-strong: #0b6e7f; /* ховер/акценты primary */
+  --color-accent: #ff7a1a; /* закатный оранжевый — CTA */
+  --color-accent-strong: #e8630a; /* ховер accent */
+  --color-ink: #0f2233; /* основной текст */
+  --color-muted: #55707f; /* второстепенный текст */
+  --color-line: #e1eaef; /* границы, разделители */
+
+  --font-sans: var(--font-app), ui-sans-serif, system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }

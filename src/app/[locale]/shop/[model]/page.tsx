@@ -1,5 +1,6 @@
+import { Container, Section, SectionHeading } from "@/components/ui";
+
 // Заглушка карточки фойла. Наполнение — Этап 6.
-// [model] — динамический сегмент (slug модели из URL).
 export default async function ShopModelPage({
   params,
 }: {
@@ -7,8 +8,10 @@ export default async function ShopModelPage({
 }) {
   const { model } = await params;
   return (
-    <main>
-      <h1>Карточка фойла — /shop/{model}</h1>
-    </main>
+    <Section className="pt-10 sm:pt-14">
+      <Container>
+        <SectionHeading eyebrow="Магазин" title={`Модель: ${model}`} subtitle="Карточка товара появится на Этапе 6." />
+      </Container>
+    </Section>
   );
 }
