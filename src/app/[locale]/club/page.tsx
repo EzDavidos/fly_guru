@@ -2,11 +2,19 @@ import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Card, Button, Badge } from "@/components/ui";
 import { IconCheck, IconWaves, IconPin, IconClub } from "@/components/icons";
 import { getService, formatVnd, formatDuration } from "@/content/services";
+import { BookingForm } from "@/components/BookingForm";
+import { getActiveServices } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Клуб" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
 
-export default function ClubPage() {
+export default async function ClubPage() {
+  // Все активные услуги из базы — на клубе человек может выбрать любую.
+  const services = await getActiveServices();
+  const defaultServiceId = services.find(
+    (s) => s.name === getService("subscription").name,
+  )?.id;
+
   const sub = getService("subscription");
   const rental = getService("rental");
 
@@ -157,7 +165,22 @@ export default function ClubPage() {
               {/* TODO: подтвердить размер награды (обсуждается +30 мин) */}
             </p>
             <div className="mt-6">
-              <Button href="/contacts" variant="secondary">Стать членом клуба</Button>
+              <Button href="#form" variant="secondary">Стать членом клуба</Button>
+            </div>
+          </div>
+        </Container>
+      </Section>
+
+      {/* Форма записи (клуб/абонемент) */}
+      <Section id="form" tone="muted">
+        <Container>
+          <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
+            <h2 className="text-2xl font-bold">Оставить заявку</h2>
+            <p className="mt-3 text-muted">
+              Хотите абонемент или есть вопросы по клубу — оставьте контакт, свяжемся и всё расскажем.
+            </p>
+            <div className="mt-8">
+              <BookingForm services={services} defaultServiceId={defaultServiceId} />
             </div>
           </div>
         </Container>

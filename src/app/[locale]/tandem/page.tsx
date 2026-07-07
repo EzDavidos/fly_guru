@@ -2,11 +2,16 @@ import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Card, Button } from "@/components/ui";
 import { Media } from "@/components/Media";
 import { getService, formatVnd, formatDuration } from "@/content/services";
+import { BookingForm } from "@/components/BookingForm";
+import { getActiveServices } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Тандем" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
 
-export default function TandemPage() {
+export default async function TandemPage() {
+  // Услуги тандема из базы (с настоящими id) — для формы записи.
+  const services = await getActiveServices("tandem");
+
   const options = [
     getService("tandem-adult"),
     getService("tandem-kid"),
@@ -63,16 +68,17 @@ export default function TandemPage() {
         </Container>
       </Section>
 
-      {/* Секция под форму записи — форма появится на этапе 2 */}
+      {/* Форма записи на тандем */}
       <Section id="form">
         <Container>
-          <div className="mx-auto max-w-2xl rounded-3xl border border-dashed border-primary/40 bg-surface p-8 text-center sm:p-10">
+          <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
             <h2 className="text-2xl font-bold">Запись на тандем</h2>
             <p className="mt-3 text-muted">
-              {/* TODO (этап 2): форма записи */}
-              Форма записи появится здесь на следующем этапе. Пока свяжитесь с нами напрямую —
-              контакты в подвале сайта.
+              Оставьте контакт — свяжемся и подберём удобное время для полёта.
             </p>
+            <div className="mt-8">
+              <BookingForm services={services} />
+            </div>
           </div>
         </Container>
       </Section>

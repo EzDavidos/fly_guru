@@ -5,11 +5,20 @@ import { Faq } from "@/components/Faq";
 import { IconCheck } from "@/components/icons";
 import { getService, formatVnd, formatDuration } from "@/content/services";
 import { trainingFaq } from "@/content/faq";
+import { BookingForm } from "@/components/BookingForm";
+import { getActiveServices } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Обучение" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
 
-export default function TrainingPage() {
+export default async function TrainingPage() {
+  // Услуги обучения из базы (с настоящими id) — для выпадающего списка в форме.
+  const services = await getActiveServices("training");
+  // Заранее выбираем «взрослый базовый» — самый популярный вариант.
+  const defaultServiceId = services.find(
+    (s) => s.name === getService("basic-adult").name,
+  )?.id;
+
   const options = [
     { s: getService("basic-adult"), highlight: true, desc: "Индивидуальное занятие для взрослого с нуля." },
     { s: getService("basic-kid"), highlight: false, desc: "Отдельная программа для детей до 14 лет." },
@@ -90,16 +99,17 @@ export default function TrainingPage() {
         </Container>
       </Section>
 
-      {/* Секция под форму записи — форма появится на этапе 2 */}
+      {/* Форма записи на обучение */}
       <Section id="form" tone="muted">
         <Container>
-          <div className="mx-auto max-w-2xl rounded-3xl border border-dashed border-primary/40 bg-surface p-8 text-center sm:p-10">
+          <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
             <h2 className="text-2xl font-bold">Запись на обучение</h2>
             <p className="mt-3 text-muted">
-              {/* TODO (этап 2): здесь будет форма записи (имя, телефон/мессенджер, дата) */}
-              Форма записи появится здесь на следующем этапе. Пока свяжитесь с нами напрямую —
-              контакты в подвале сайта.
+              Оставьте контакт — свяжемся, подтвердим время и ответим на вопросы.
             </p>
+            <div className="mt-8">
+              <BookingForm services={services} defaultServiceId={defaultServiceId} />
+            </div>
           </div>
         </Container>
       </Section>

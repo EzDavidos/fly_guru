@@ -6,6 +6,7 @@ import { setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { Attribution } from "@/components/Attribution";
 import "../globals.css";
 
 // Self-hosted шрифт (грузится с нашего домена, без обращения к Google на клиенте).
@@ -42,6 +43,8 @@ export default async function LocaleLayout({
     <html lang={locale} className={`${font.variable} h-full`}>
       <body className="flex min-h-full flex-col">
         <NextIntlClientProvider>
+          {/* Невидимая «ловушка меток» источника — работает на всех страницах. */}
+          <Attribution />
           <SiteHeader />
           <main className="flex-1">{children}</main>
           <SiteFooter />
