@@ -68,8 +68,14 @@ export default async function ReferralLandingPage({
                 <Button href="#form" size="lg">Записаться со скидкой</Button>
               </div>
             </div>
-            {/* TODO: фото/видео гостя на воде */}
-            <Media ratio="4/3" priority sizes="(min-width: 768px) 50vw, 100vw" />
+            <Media
+              src="/media/photo/ref-hero.webp"
+              alt="Довольный гость FlyGuru на электрофойле"
+              ratio="3/4"
+              priority
+              className="mx-auto max-w-sm"
+              sizes="(min-width: 768px) 50vw, 100vw"
+            />
           </div>
         </Container>
       </Section>

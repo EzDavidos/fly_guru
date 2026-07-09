@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Card, Button, Badge } from "@/components/ui";
-import { Media } from "@/components/Media";
+import { Media, VideoPlayer } from "@/components/Media";
 import { Faq } from "@/components/Faq";
 import { IconCheck } from "@/components/icons";
 import { getService, formatVnd, formatDuration } from "@/content/services";
@@ -45,8 +45,13 @@ export default async function TrainingPage() {
                 <Button href="#form" size="lg">Записаться на обучение</Button>
               </div>
             </div>
-            {/* TODO: фото ученика на воде с инструктором */}
-            <Media ratio="4/3" priority sizes="(min-width: 768px) 50vw, 100vw" />
+            <Media
+              src="/media/photo/training-hero.webp"
+              alt="Ученик на электрофойле рядом с инструктором"
+              ratio="4/3"
+              priority
+              sizes="(min-width: 768px) 50vw, 100vw"
+            />
           </div>
         </Container>
       </Section>
@@ -89,8 +94,43 @@ export default async function TrainingPage() {
         </Container>
       </Section>
 
-      {/* Сжатый FAQ */}
+      {/* Как проходит занятие */}
       <Section>
+        <Container>
+          <div className="grid items-center gap-10 md:grid-cols-2">
+            <div>
+              <SectionHeading eyebrow="Как это выглядит" title="Занятие изнутри" />
+              <p className="mt-4 text-muted">
+                Короткий инструктаж на берегу, затем сразу вода. Инструктор идёт рядом
+                и держит с вами связь через наушник в шлеме — подсказывает каждое движение.
+              </p>
+              <div className="mt-6 grid grid-cols-2 gap-4">
+                <Media
+                  src="/media/photo/training-uchenik.webp"
+                  alt="Ученик самостоятельно едет на электрофойле"
+                  ratio="4/3"
+                  sizes="(min-width: 768px) 25vw, 50vw"
+                />
+                <Media
+                  src="/media/photo/training-master.webp"
+                  alt="Продвинутый курс: уверенное катание на электрофойле"
+                  ratio="4/3"
+                  sizes="(min-width: 768px) 25vw, 50vw"
+                />
+              </div>
+            </div>
+            <VideoPlayer
+              src="/media/video/obuchenie.mp4"
+              poster="/media/video/obuchenie-poster.jpg"
+              ratio="3/4"
+              className="mx-auto max-w-sm"
+            />
+          </div>
+        </Container>
+      </Section>
+
+      {/* Сжатый FAQ */}
+      <Section tone="muted">
         <Container>
           <SectionHeading eyebrow="Частые вопросы" title="Перед первым занятием" />
           <div className="mt-8 max-w-3xl">
@@ -100,7 +140,7 @@ export default async function TrainingPage() {
       </Section>
 
       {/* Форма записи на обучение */}
-      <Section id="form" tone="muted">
+      <Section id="form">
         <Container>
           <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
             <h2 className="text-2xl font-bold">Запись на обучение</h2>

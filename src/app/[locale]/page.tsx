@@ -1,5 +1,5 @@
 import { Container, Section, SectionHeading, Card, Button } from "@/components/ui";
-import { Media } from "@/components/Media";
+import { Media, VideoLoop } from "@/components/Media";
 import { Faq } from "@/components/Faq";
 import { ReviewCard } from "@/components/ReviewCard";
 import { IconTandem, IconFoil, IconClub, IconArrowRight } from "@/components/icons";
@@ -55,8 +55,12 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-            {/* TODO: заменить на реальное фото/видео полёта над водой */}
-            <Media ratio="4/3" priority sizes="(min-width: 768px) 50vw, 100vw" />
+            <VideoLoop
+              src="/media/video/hero-loop.mp4"
+              poster="/media/video/hero-loop-poster.jpg"
+              ratio="4/3"
+              priority
+            />
           </div>
         </Container>
       </Section>
@@ -130,8 +134,12 @@ export default function HomePage() {
                 <Button href="/shop">Смотреть магазин</Button>
               </div>
             </div>
-            {/* TODO: фото фойла на белом фоне */}
-            <Media ratio="16/9" sizes="(min-width: 768px) 50vw, 100vw" />
+            <Media
+              src="/media/photo/shop-foil.webp"
+              alt="Электрофойл FlyGuru на пляже в Нячанге"
+              ratio="16/9"
+              sizes="(min-width: 768px) 50vw, 100vw"
+            />
           </div>
         </Container>
       </Section>

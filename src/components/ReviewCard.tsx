@@ -15,6 +15,16 @@ export function ReviewCard({ review }: { review: Review }) {
         {review.name}
         {review.role && <span className="font-normal text-muted"> · {review.role}</span>}
       </p>
+      {review.sourceUrl && (
+        <a
+          href={review.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 text-xs text-primary hover:text-primary-strong"
+        >
+          Отзыв в Google Maps
+        </a>
+      )}
     </Card>
   );
 }

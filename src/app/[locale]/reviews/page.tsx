@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Button } from "@/components/ui";
 import { ReviewCard } from "@/components/ReviewCard";
+import { Media } from "@/components/Media";
 import { reviews } from "@/content/reviews";
 
 export const metadata: Metadata = { title: "Отзывы" };
@@ -13,9 +14,15 @@ export default function ReviewsPage() {
         <SectionHeading
           eyebrow="Отзывы"
           title="Что говорят наши ученики"
-          subtitle="Реальные истории тех, кто уже летает с FlyGuru."
+          subtitle="Реальные отзывы с Google Maps — от тех, кто уже летает с FlyGuru."
         />
-        {/* TODO: заменить рыбу на реальные отзывы (см. src/content/reviews.ts) */}
+        <Media
+          src="/media/photo/semya-prokat.webp"
+          alt="Семья после катания на электрофойлах с FlyGuru"
+          ratio="16/9"
+          className="mt-8"
+          priority
+        />
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {reviews.map((r, i) => (
             <ReviewCard key={i} review={r} />

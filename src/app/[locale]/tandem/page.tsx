@@ -38,8 +38,14 @@ export default async function TandemPage() {
                 <Button href="#form" size="lg">Записаться на тандем</Button>
               </div>
             </div>
-            {/* TODO: фото/видео тандемного полёта */}
-            <Media ratio="4/3" priority sizes="(min-width: 768px) 50vw, 100vw" />
+            <Media
+              src="/media/photo/tandem-hero.webp"
+              alt="Тандемный полёт на электрофойле: гостья и инструктор на одной доске"
+              ratio="3/4"
+              priority
+              className="mx-auto max-w-sm"
+              sizes="(min-width: 768px) 50vw, 100vw"
+            />
           </div>
         </Container>
       </Section>
@@ -68,8 +74,35 @@ export default async function TandemPage() {
         </Container>
       </Section>
 
+      {/* Галерея тандемов */}
+      <Section>
+        <Container>
+          <SectionHeading eyebrow="Как это проходит" title="Летают все — от детей до взрослых" />
+          <div className="mt-10 grid gap-6 sm:grid-cols-3">
+            <Media
+              src="/media/photo/tandem-rebenok-gor.webp"
+              alt="Тандемный полёт с ребёнком в спасательном жилете и шлеме"
+              ratio="1/1"
+              sizes="(min-width: 640px) 33vw, 100vw"
+            />
+            <Media
+              src="/media/photo/tandem-2.webp"
+              alt="Гостья на электрофойле в тандеме с инструктором"
+              ratio="1/1"
+              sizes="(min-width: 640px) 33vw, 100vw"
+            />
+            <Media
+              src="/media/photo/tandem-rebenok.webp"
+              alt="Ребёнок летит над водой на электрофойле с инструктором"
+              ratio="1/1"
+              sizes="(min-width: 640px) 33vw, 100vw"
+            />
+          </div>
+        </Container>
+      </Section>
+
       {/* Форма записи на тандем */}
-      <Section id="form">
+      <Section tone="muted" id="form">
         <Container>
           <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
             <h2 className="text-2xl font-bold">Запись на тандем</h2>

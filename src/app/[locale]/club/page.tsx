@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Card, Button, Badge } from "@/components/ui";
 import { IconCheck, IconWaves, IconPin, IconClub } from "@/components/icons";
+import { Media, VideoLoop } from "@/components/Media";
 import { getService, formatVnd, formatDuration } from "@/content/services";
 import { BookingForm } from "@/components/BookingForm";
 import { getActiveServices } from "@/lib/services";
@@ -25,6 +26,22 @@ export default async function ClubPage() {
 
   const tours = [getService("excursion"), getService("journey"), getService("safari")];
 
+  // Фото к карточкам выездов — по id услуги.
+  const tourPhoto: Record<string, { src: string; alt: string }> = {
+    excursion: {
+      src: "/media/photo/ekskursiya.webp",
+      alt: "Экскурсия на электрофойлах вдоль побережья Нячанга",
+    },
+    journey: {
+      src: "/media/photo/ekskursiya-instruktor.webp",
+      alt: "Путешествие на электрофойлах с инструктором",
+    },
+    safari: {
+      src: "/media/photo/safari-ostrov.webp",
+      alt: "Сафари на электрофойлах: остановка у острова",
+    },
+  };
+
   return (
     <>
       <Section className="pt-10 sm:pt-14">
@@ -39,6 +56,13 @@ export default async function ClubPage() {
             Клуб — это про регулярное катание по выгодной цене и доступ к экскурсиям,
             путешествиям и сафари вместе с командой.
           </p>
+          <VideoLoop
+            src="/media/video/club-loop.mp4"
+            poster="/media/video/club-loop-poster.jpg"
+            ratio="16/9"
+            className="mt-10"
+            priority
+          />
         </Container>
       </Section>
 
@@ -113,6 +137,29 @@ export default async function ClubPage() {
                 <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Минуты за приглашённых друзей</li>
                 <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Выгодная цена за минуту катания</li>
               </ul>
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                <Media
+                  src="/media/photo/club-kokos.webp"
+                  alt="Кокос на доске электрофойла посреди моря"
+                  ratio="1/1"
+                  rounded="rounded-xl"
+                  sizes="120px"
+                />
+                <Media
+                  src="/media/photo/club-napitok.webp"
+                  alt="Гость клуба с напитком на электрофойле"
+                  ratio="1/1"
+                  rounded="rounded-xl"
+                  sizes="120px"
+                />
+                <Media
+                  src="/media/photo/club-3-v-more.webp"
+                  alt="Трое членов клуба на электрофойлах в открытом море"
+                  ratio="1/1"
+                  rounded="rounded-xl"
+                  sizes="120px"
+                />
+              </div>
             </Card>
           </div>
         </Container>
@@ -129,6 +176,13 @@ export default async function ClubPage() {
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {tours.map((s) => (
               <Card key={s.id} className="flex h-full flex-col">
+                <Media
+                  src={tourPhoto[s.id].src}
+                  alt={tourPhoto[s.id].alt}
+                  ratio="16/9"
+                  className="mb-4"
+                  sizes="(min-width: 768px) 33vw, 100vw"
+                />
                 <div className="mb-3 flex items-center gap-2">
                   <IconPin className="h-5 w-5 text-primary" />
                   <Badge>Только для членов клуба</Badge>
