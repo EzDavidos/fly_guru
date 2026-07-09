@@ -17,9 +17,9 @@ export default function ReviewsPage() {
           subtitle="Реальные отзывы с Google Maps — от тех, кто уже летает с FlyGuru."
         />
         <Media
-          src="/media/photo/semya-prokat.webp"
-          alt="Семья после катания на электрофойлах с FlyGuru"
-          ratio="16/9"
+          src="/media/photo/poza-guru.webp"
+          alt="Инструктор FlyGuru летит над водой на электрофойле"
+          ratio="21/9"
           className="mt-8"
           priority
         />

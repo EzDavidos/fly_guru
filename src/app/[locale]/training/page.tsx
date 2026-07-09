@@ -29,8 +29,8 @@ export default async function TrainingPage() {
     <>
       <Section className="pt-10 sm:pt-14">
         <Container>
-          <div className="grid items-center gap-10 md:grid-cols-2">
-            <div>
+          <div className="grid items-center gap-10 md:grid-cols-12">
+            <div className="md:col-span-5">
               <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-primary">
                 Базовое обучение
               </p>
@@ -48,9 +48,10 @@ export default async function TrainingPage() {
             <Media
               src="/media/photo/training-hero.webp"
               alt="Ученик на электрофойле рядом с инструктором"
-              ratio="4/3"
+              ratio="16/9"
+              className="md:col-span-7"
               priority
-              sizes="(min-width: 768px) 50vw, 100vw"
+              sizes="(min-width: 768px) 58vw, 100vw"
             />
           </div>
         </Container>
@@ -97,33 +98,34 @@ export default async function TrainingPage() {
       {/* Как проходит занятие */}
       <Section>
         <Container>
-          <div className="grid items-center gap-10 md:grid-cols-2">
-            <div>
+          <div className="grid items-center gap-10 md:grid-cols-12">
+            <div className="md:col-span-7">
               <SectionHeading eyebrow="Как это выглядит" title="Занятие изнутри" />
               <p className="mt-4 text-muted">
                 Короткий инструктаж на берегу, затем сразу вода. Инструктор идёт рядом
                 и держит с вами связь через наушник в шлеме — подсказывает каждое движение.
               </p>
-              <div className="mt-6 grid grid-cols-2 gap-4">
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
                 <Media
                   src="/media/photo/training-uchenik.webp"
                   alt="Ученик самостоятельно едет на электрофойле"
-                  ratio="4/3"
-                  sizes="(min-width: 768px) 25vw, 50vw"
+                  ratio="16/9"
+                  sizes="(min-width: 768px) 29vw, 50vw"
                 />
                 <Media
                   src="/media/photo/training-master.webp"
                   alt="Продвинутый курс: уверенное катание на электрофойле"
-                  ratio="4/3"
-                  sizes="(min-width: 768px) 25vw, 50vw"
+                  ratio="16/9"
+                  sizes="(min-width: 768px) 29vw, 50vw"
                 />
               </div>
             </div>
+            {/* Ролик снят вертикально — показываем в родных 9:16, ограничив ширину. */}
             <VideoPlayer
               src="/media/video/obuchenie.mp4"
               poster="/media/video/obuchenie-poster.jpg"
-              ratio="3/4"
-              className="mx-auto max-w-sm"
+              ratio="9/16"
+              className="mx-auto max-w-[320px] md:col-span-5"
             />
           </div>
         </Container>

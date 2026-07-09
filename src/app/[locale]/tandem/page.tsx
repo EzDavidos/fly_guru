@@ -21,8 +21,9 @@ export default async function TandemPage() {
     <>
       <Section className="pt-10 sm:pt-14">
         <Container>
-          <div className="grid items-center gap-10 md:grid-cols-2">
-            <div>
+          {/* Кадр вертикальный, поэтому колонка под него уже, чем текстовая. */}
+          <div className="grid items-center gap-10 md:grid-cols-12">
+            <div className="md:col-span-7">
               <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-primary">
                 Тандем с инструктором
               </p>
@@ -38,13 +39,15 @@ export default async function TandemPage() {
                 <Button href="#form" size="lg">Записаться на тандем</Button>
               </div>
             </div>
+            {/* Кадр снят вертикально — родные 9:16, иначе object-cover срежет
+                инструктора сверху и доску снизу. */}
             <Media
               src="/media/photo/tandem-hero.webp"
               alt="Тандемный полёт на электрофойле: гостья и инструктор на одной доске"
-              ratio="3/4"
+              ratio="9/16"
               priority
-              className="mx-auto max-w-sm"
-              sizes="(min-width: 768px) 50vw, 100vw"
+              className="mx-auto max-w-[340px] md:col-span-5"
+              sizes="340px"
             />
           </div>
         </Container>
@@ -82,19 +85,19 @@ export default async function TandemPage() {
             <Media
               src="/media/photo/tandem-rebenok-gor.webp"
               alt="Тандемный полёт с ребёнком в спасательном жилете и шлеме"
-              ratio="1/1"
+              ratio="3/4"
               sizes="(min-width: 640px) 33vw, 100vw"
             />
             <Media
               src="/media/photo/tandem-2.webp"
               alt="Гостья на электрофойле в тандеме с инструктором"
-              ratio="1/1"
+              ratio="3/4"
               sizes="(min-width: 640px) 33vw, 100vw"
             />
             <Media
               src="/media/photo/tandem-rebenok.webp"
               alt="Ребёнок летит над водой на электрофойле с инструктором"
-              ratio="1/1"
+              ratio="3/4"
               sizes="(min-width: 640px) 33vw, 100vw"
             />
           </div>

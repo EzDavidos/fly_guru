@@ -54,8 +54,8 @@ export default async function ReferralLandingPage({
       {/* Герой */}
       <Section className="pt-10 sm:pt-14">
         <Container>
-          <div className="grid items-center gap-10 md:grid-cols-2">
-            <div>
+          <div className="grid items-center gap-10 md:grid-cols-12">
+            <div className="md:col-span-7">
               <Badge>Приглашение по личной ссылке</Badge>
               <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-4xl">
                 Полетите на электрофойле уже на первом занятии
@@ -71,10 +71,10 @@ export default async function ReferralLandingPage({
             <Media
               src="/media/photo/ref-hero.webp"
               alt="Довольный гость FlyGuru на электрофойле"
-              ratio="3/4"
+              ratio="9/16"
               priority
-              className="mx-auto max-w-sm"
-              sizes="(min-width: 768px) 50vw, 100vw"
+              className="mx-auto max-w-[340px] md:col-span-5"
+              sizes="340px"
             />
           </div>
         </Container>

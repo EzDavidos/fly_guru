@@ -37,8 +37,8 @@ export default async function ClubPage() {
       alt: "Путешествие на электрофойлах с инструктором",
     },
     safari: {
-      src: "/media/photo/safari-ostrov.webp",
-      alt: "Сафари на электрофойлах: остановка у острова",
+      src: "/media/photo/club-3-v-more.webp",
+      alt: "Сафари на электрофойлах: целый день в открытом море",
     },
   };
 
@@ -56,10 +56,11 @@ export default async function ClubPage() {
             Клуб — это про регулярное катание по выгодной цене и доступ к экскурсиям,
             путешествиям и сафари вместе с командой.
           </p>
+          {/* 21:9 — кадр открытого моря читается как баннер и не съедает экран. */}
           <VideoLoop
             src="/media/video/club-loop.mp4"
             poster="/media/video/club-loop-poster.jpg"
-            ratio="16/9"
+            ratio="21/9"
             className="mt-10"
             priority
           />
@@ -153,8 +154,8 @@ export default async function ClubPage() {
                   sizes="120px"
                 />
                 <Media
-                  src="/media/photo/club-3-v-more.webp"
-                  alt="Трое членов клуба на электрофойлах в открытом море"
+                  src="/media/photo/safari-ostrov.webp"
+                  alt="Электрофойлы на берегу острова во время сафари"
                   ratio="1/1"
                   rounded="rounded-xl"
                   sizes="120px"

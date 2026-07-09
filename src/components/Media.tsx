@@ -1,7 +1,20 @@
 import Image from "next/image";
 
-// Обёртка next/image. Размеры фиксируют место под картинку → нет сдвига
-// вёрстки (важно для Lighthouse). Без `src` показывает серый плейсхолдер.
+// Соотношение сторон задаём строкой «ширина/высота» — под каждый кадр своё,
+// чтобы object-cover не срезал головы. Значения см. в src/content/media.ts.
+type Ratio = `${number}/${number}`;
+
+const box = (ratio: Ratio, rounded: string, className: string) => ({
+  // w-full обязателен: у grid-элемента с `mx-auto` ширина иначе считается по
+  // содержимому, а содержимое здесь — absolute-картинка, т.е. ноль.
+  className: `relative w-full overflow-hidden bg-surface-2 ${rounded} ${className}`,
+  style: { aspectRatio: ratio.replace("/", " / ") },
+});
+
+// next/image по умолчанию пережимает в quality=75 поверх наших WebP.
+// 90 заметно чище на воде и небе; значение разрешено в next.config.ts.
+const QUALITY = 90;
+
 export function Media({
   src = "/placeholders/media.svg",
   ratio = "16/9",
@@ -12,7 +25,7 @@ export function Media({
   alt = "FlyGuru — плейсхолдер фото",
 }: {
   src?: string;
-  ratio?: "16/9" | "4/3" | "1/1" | "3/4";
+  ratio?: Ratio;
   className?: string;
   sizes?: string;
   priority?: boolean;
@@ -20,16 +33,14 @@ export function Media({
   alt?: string;
 }) {
   return (
-    <div
-      className={`relative overflow-hidden bg-surface-2 ${rounded} ${className}`}
-      style={{ aspectRatio: ratio.replace("/", " / ") }}
-    >
+    <div {...box(ratio, rounded, className)}>
       <Image
         src={src}
         alt={alt}
         fill
         sizes={sizes}
         priority={priority}
+        quality={QUALITY}
         className="object-cover"
       />
     </div>
@@ -37,7 +48,6 @@ export function Media({
 }
 
 // Зацикленное видео без звука. Играет само, как «живое фото».
-// poster показывается, пока видео грузится, и на мобильных при экономии трафика.
 export function VideoLoop({
   src,
   poster,
@@ -49,16 +59,13 @@ export function VideoLoop({
 }: {
   src: string;
   poster: string;
-  ratio?: "16/9" | "4/3" | "1/1" | "3/4";
+  ratio?: Ratio;
   className?: string;
   rounded?: string;
   priority?: boolean;
 }) {
   return (
-    <div
-      className={`relative overflow-hidden bg-surface-2 ${rounded} ${className}`}
-      style={{ aspectRatio: ratio.replace("/", " / ") }}
-    >
+    <div {...box(ratio, rounded, className)}>
       <video
         src={src}
         poster={poster}
@@ -83,15 +90,12 @@ export function VideoPlayer({
 }: {
   src: string;
   poster: string;
-  ratio?: "16/9" | "4/3" | "1/1" | "3/4";
+  ratio?: Ratio;
   className?: string;
   rounded?: string;
 }) {
   return (
-    <div
-      className={`relative overflow-hidden bg-surface-2 ${rounded} ${className}`}
-      style={{ aspectRatio: ratio.replace("/", " / ") }}
-    >
+    <div {...box(ratio, rounded, className)}>
       <video
         src={src}
         poster={poster}

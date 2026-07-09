@@ -34,8 +34,9 @@ export default function HomePage() {
       {/* ── Hero ── */}
       <Section className="pt-10 sm:pt-16">
         <Container>
-          <div className="grid items-center gap-10 md:grid-cols-2">
-            <div>
+          {/* Медиа шире текста: кадр 16:9 в половине колонки смотрится мелко. */}
+          <div className="grid items-center gap-10 md:grid-cols-12">
+            <div className="md:col-span-5">
               <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-primary">
                 Электрофойл-школа в Нячанге
               </p>
@@ -58,7 +59,8 @@ export default function HomePage() {
             <VideoLoop
               src="/media/video/hero-loop.mp4"
               poster="/media/video/hero-loop-poster.jpg"
-              ratio="4/3"
+              ratio="16/9"
+              className="md:col-span-7"
               priority
             />
           </div>
@@ -137,7 +139,7 @@ export default function HomePage() {
             <Media
               src="/media/photo/shop-foil.webp"
               alt="Электрофойл FlyGuru на пляже в Нячанге"
-              ratio="16/9"
+              ratio="3/2"
               sizes="(min-width: 768px) 50vw, 100vw"
             />
           </div>
