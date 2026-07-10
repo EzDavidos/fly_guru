@@ -15,6 +15,9 @@ export interface AppUser {
   name: string;
   phone: string | null;
   email: string | null;
+  photo_url: string | null;
+  age: number | null;
+  monthly_goal: number | null; // личная цель по ЗП на месяц, ₫
 }
 
 // Домашняя страница каждой роли (куда отправлять после входа).
@@ -36,7 +39,7 @@ export async function getAppUser(): Promise<AppUser | null> {
   // RLS: политика users_select_own разрешает читать только свою строку.
   const { data } = await supabase
     .from("users")
-    .select("id, role, name, phone, email")
+    .select("id, role, name, phone, email, photo_url, age, monthly_goal")
     .eq("auth_id", user.id)
     .maybeSingle();
   if (!data) return null;

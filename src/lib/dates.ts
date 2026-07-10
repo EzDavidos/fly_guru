@@ -40,6 +40,41 @@ export function vnCurrentMonth() {
   };
 }
 
+// Произвольный период для статистики: обе даты включительно ('YYYY-MM-DD').
+// Возвращает те же границы, что и vnCurrentMonth: правая — эксклюзивная
+// (date >= fromDay AND date < toDay), ISO — местная полночь в UTC.
+export function vnPeriod(fromDay: string, toDayInclusive: string) {
+  const from = new Date(`${fromDay}T00:00:00Z`);
+  const to = new Date(`${toDayInclusive}T00:00:00Z`);
+  to.setUTCDate(to.getUTCDate() + 1); // включительно → эксклюзивная граница
+
+  return {
+    fromDay,
+    toDay: to.toISOString().slice(0, 10),
+    fromIso: new Date(from.getTime() - VN_OFFSET_MS).toISOString(),
+    toIso: new Date(to.getTime() - VN_OFFSET_MS).toISOString(),
+  };
+}
+
+// Сдвиг даты 'YYYY-MM-DD' на n дней (для пресетов «последние 7 дней» и т.п.).
+export function vnShiftDays(day: string, n: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Границы прошлого месяца в Нячанге (пресет статистики): первая и последняя
+// даты месяца, обе включительно — в формате инпутов формы.
+export function vnPrevMonth() {
+  const now = vnNow();
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return {
+    fromDay: from.toISOString().slice(0, 10),
+    lastDay: vnShiftDays(to.toISOString().slice(0, 10), -1),
+  };
+}
+
 // Дата продажи + 3 месяца — срок жизни минут абонемента (архитектура, раздел 2).
 export function subscriptionExpiry(from: Date = new Date()): Date {
   const d = new Date(from);
