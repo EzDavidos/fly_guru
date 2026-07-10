@@ -1,242 +1,136 @@
-import type { Metadata } from "next";
-import { Container, Section, Badge } from "@/components/ui";
+import Image from "next/image";
+import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/auth";
-import { vnToday } from "@/lib/dates";
+import { getAppUser } from "@/lib/auth";
+import { vnCurrentMonth } from "@/lib/dates";
+import { vnd } from "@/lib/stats";
 import { logoutAction } from "../login/actions";
-import {
-  confirmBookingAction,
-  saveBookingAction,
-  togglePinAction,
-  cancelBookingAction,
-} from "./actions";
 
-export const metadata: Metadata = { title: "Админка · Заявки" };
+// Главный экран админки: карточка профиля (фото + выручка школы за месяц)
+// и кнопки-разделы. Формат тот же, что у инструктора; разделы включаются
+// по мере готовности подэтапов Этапа 4.
 
-// Приём заявок с сайта — теперь зона админа (раньше был экран в кабинете
-// инструктора). Админ созванивается, вносит время/возраст/вес и подтверждает —
-// заявка становится «записью» у инструкторов. Остальная админка — Этап 4.
-
-interface BookingRow {
-  id: string;
-  client_name: string;
-  phone: string;
-  preferred_date: string | null;
-  scheduled_time: string | null;
-  age: number | null;
-  weight: number | null;
-  status: string;
-  pinned: boolean;
-  ref_code: string | null;
-  internal_note: string | null;
-  created_at: string;
-  services: { name: string } | null;
-  accepted: { name: string } | null;
+// Красный кружочек-счётчик в углу кнопки.
+function CountBubble({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+      {count}
+    </span>
+  );
 }
 
-const inputClass =
-  "w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
+const tileClass =
+  "relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border border-line bg-surface p-4 text-sm font-semibold transition-colors hover:border-primary";
 
-// Редактируемые поля созвона + кнопки. Какие кнопки показать, зависит от статуса.
-function BookingCard({ b, today }: { b: BookingRow; today: string }) {
-  const isNew = b.status === "new";
-
+// Раздел ещё не готов: серая плитка без ссылки, чтобы структура кабинета
+// была видна сразу, а включение раздела не двигало кнопки местами.
+function SoonTile({ label }: { label: string }) {
   return (
-    <div
-      className={`rounded-2xl border bg-surface p-4 ${
-        b.pinned ? "border-accent" : "border-line"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-bold">
-            {b.pinned && <span title="Закреплена">📌 </span>}
-            {b.client_name}
-          </p>
-          <a href={`tel:${b.phone}`} className="text-sm text-primary underline">
-            {b.phone}
-          </a>
-        </div>
-        <Badge>{isNew ? "Новая" : "Запись"}</Badge>
-      </div>
-
-      <div className="mt-2 space-y-0.5 text-sm text-muted">
-        {b.services?.name && <p>{b.services.name}</p>}
-        {b.preferred_date && (
-          <p>{b.preferred_date === today ? "Сегодня" : b.preferred_date}</p>
-        )}
-        {b.ref_code && <p>Реф-код: {b.ref_code} (скидка 200 000 ₫ на базовое)</p>}
-        {b.accepted && <p className="text-primary">Принял: {b.accepted.name}</p>}
-      </div>
-
-      <form action={isNew ? confirmBookingAction : saveBookingAction} className="mt-3">
-        <input type="hidden" name="id" value={b.id} />
-        <input type="hidden" name="pinned" value={b.pinned ? "1" : "0"} />
-
-        <div className="grid grid-cols-3 gap-2">
-          <label className="text-xs text-muted">
-            Время прихода
-            <input
-              type="text"
-              name="scheduledTime"
-              defaultValue={b.scheduled_time ?? ""}
-              placeholder="10:30"
-              className={`mt-1 ${inputClass}`}
-            />
-          </label>
-          <label className="text-xs text-muted">
-            Возраст
-            <input
-              type="number"
-              name="age"
-              defaultValue={b.age ?? ""}
-              min={1}
-              className={`mt-1 ${inputClass}`}
-            />
-          </label>
-          <label className="text-xs text-muted">
-            Вес, кг
-            <input
-              type="number"
-              name="weight"
-              defaultValue={b.weight ?? ""}
-              min={1}
-              className={`mt-1 ${inputClass}`}
-            />
-          </label>
-        </div>
-        <label className="mt-2 block text-xs text-muted">
-          Заметка (видна инструкторам)
-          <input
-            type="text"
-            name="note"
-            defaultValue={b.internal_note ?? ""}
-            className={`mt-1 ${inputClass}`}
-          />
-        </label>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="submit"
-            className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent-strong"
-          >
-            {isNew ? "Подтвердить → в записи" : "Сохранить"}
-          </button>
-          {!isNew && (
-            <button
-              formAction={togglePinAction}
-              className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
-            >
-              {b.pinned ? "Открепить" : "Закрепить"}
-            </button>
-          )}
-          <button
-            formAction={cancelBookingAction}
-            className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-red-500 hover:text-red-500"
-          >
-            Отменить
-          </button>
-        </div>
-      </form>
+    <div className={`${tileClass} cursor-default opacity-45 hover:border-line`}>
+      {label}
+      <span className="text-xs font-normal text-muted">скоро</span>
     </div>
   );
 }
 
-export default async function AdminPage() {
-  const user = await requireRole("admin", "/admin");
+export default async function AdminHomePage() {
+  const user = await getAppUser();
+  if (!user) return null; // layout уже средиректил бы; страховка для типов
+
   const supabase = await createClient();
-  const today = vnToday();
+  const month = vnCurrentMonth();
 
-  // Открытые заявки + немного недавних закрытых (для контекста «что было»).
-  const { data } = await supabase
-    .from("bookings")
-    .select(
-      "id, client_name, phone, preferred_date, scheduled_time, age, weight, status, pinned, ref_code, internal_note, created_at, services(name), accepted:users!accepted_by(name)",
-    )
-    .order("created_at", { ascending: false })
-    .limit(100);
+  // Три независимых запроса — параллельно (база в другом регионе, каждый
+  // последовательный поход — лишние миллисекунды).
+  const [sessionsRes, paidSubsRes, freshRes] = await Promise.all([
+    // Выручка школы: чеки всех сессий за месяц…
+    supabase
+      .from("sessions")
+      .select("amount")
+      .gte("date", month.fromDay)
+      .lt("date", month.toDay),
+    // …плюс абонементы, ОПЛАЧЕННЫЕ в этом месяце (правило: доход существует
+    // только после факта оплаты; месяц оплаты, не месяц продажи).
+    supabase
+      .from("subscriptions")
+      .select("price")
+      .gte("paid_at", month.fromIso)
+      .lt("paid_at", month.toIso),
+    // Новые заявки, ждущие реакции админа.
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "new"),
+  ]);
 
-  const bookings = (data ?? []) as unknown as BookingRow[];
-  const fresh = bookings.filter((b) => b.status === "new");
-  // Записи: закреплённые сверху, дальше по ближайшей дате.
-  const confirmed = bookings
-    .filter((b) => b.status === "confirmed")
-    .sort(
-      (a, b) =>
-        Number(b.pinned) - Number(a.pinned) ||
-        (a.preferred_date ?? "9999").localeCompare(b.preferred_date ?? "9999"),
-    );
-  const closed = bookings
-    .filter((b) => b.status === "done" || b.status === "cancelled")
-    .slice(0, 10);
+  const revenue =
+    (sessionsRes.data ?? []).reduce((s, r) => s + (r.amount ?? 0), 0) +
+    (paidSubsRes.data ?? []).reduce((s, r) => s + (r.price ?? 0), 0);
+  const freshCount = freshRes.count ?? 0;
 
   return (
-    <Section className="pt-10 sm:pt-14">
-      <Container className="max-w-3xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-              Админка · {user.name}
-            </p>
-            <h1 className="text-2xl font-bold">Заявки</h1>
-          </div>
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
-            >
-              Выйти
-            </button>
-          </form>
-        </div>
-        <p className="mt-1 text-sm text-muted">
-          Созвонились с гостем → внесите время, возраст и вес → «Подтвердить».
-          Запись появится у инструкторов; закреплённые — сверху их списка.
-        </p>
-
-        <h2 className="mt-8 text-lg font-bold">Новые ({fresh.length})</h2>
-        {fresh.length === 0 && (
-          <p className="mt-2 text-sm text-muted">Новых заявок нет.</p>
-        )}
-        <div className="mt-3 space-y-3">
-          {fresh.map((b) => (
-            <BookingCard key={b.id} b={b} today={today} />
-          ))}
-        </div>
-
-        <h2 className="mt-10 text-lg font-bold">Записи у инструкторов ({confirmed.length})</h2>
-        {confirmed.length === 0 && (
-          <p className="mt-2 text-sm text-muted">Активных записей нет.</p>
-        )}
-        <div className="mt-3 space-y-3">
-          {confirmed.map((b) => (
-            <BookingCard key={b.id} b={b} today={today} />
-          ))}
-        </div>
-
-        {closed.length > 0 && (
-          <>
-            <h2 className="mt-10 text-lg font-bold">Недавно закрытые</h2>
-            <div className="mt-3 space-y-2">
-              {closed.map((b) => (
-                <div
-                  key={b.id}
-                  className="flex items-center justify-between rounded-xl border border-line/70 bg-surface px-4 py-2 text-sm text-muted"
-                >
-                  <span className="truncate">
-                    {b.client_name} · {b.services?.name ?? "—"}
-                  </span>
-                  <span>{b.status === "done" ? "Проведена ✅" : "Отменена"}</span>
-                </div>
-              ))}
+    <div>
+      {/* Карточка профиля */}
+      <div className="rounded-2xl border border-line bg-surface p-5">
+        <div className="flex items-center gap-4">
+          {user.photo_url ? (
+            <Image
+              src={user.photo_url}
+              alt={user.name}
+              width={72}
+              height={72}
+              className="h-18 w-18 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-18 w-18 shrink-0 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
+              {user.name.trim().charAt(0).toUpperCase() || "?"}
             </div>
-          </>
-        )}
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-bold">{user.name}</p>
+            <p className="text-2xl font-bold text-primary">{vnd(revenue)}</p>
+            <p className="text-xs text-muted">
+              Выручка за {month.label} · только оплаченное
+            </p>
+          </div>
+        </div>
+      </div>
 
-        <p className="mt-10 text-xs text-muted">
-          Сессии, дашборд и месячные расчёты появятся на Этапе 4.
-        </p>
-      </Container>
-    </Section>
+      {/* Кнопки-разделы */}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Link
+          href="/admin/bookings"
+          className="relative col-span-2 flex min-h-20 items-center justify-center rounded-2xl bg-accent p-4 text-base font-bold text-white transition-colors hover:bg-accent-strong"
+        >
+          Актуальные заявки
+          <CountBubble count={freshCount} />
+        </Link>
+
+        <SoonTile label="Сессии" />
+        <SoonTile label="Абонементы" />
+
+        <SoonTile label="Клиенты" />
+        <SoonTile label="Агенты" />
+
+        <SoonTile label="Члены клуба" />
+        <SoonTile label="Материалы" />
+
+        <SoonTile label="Дашборд" />
+        <SoonTile label="Расчёт месяца" />
+
+        <SoonTile label="Услуги" />
+        <Link href="/instructor/settings" className={tileClass}>
+          Настройки
+          <span className="text-xs font-normal text-muted">имя · фото</span>
+        </Link>
+
+        <form action={logoutAction} className="col-span-2 contents">
+          <button type="submit" className={`${tileClass} col-span-2 text-muted`}>
+            Выход
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }
