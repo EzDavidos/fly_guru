@@ -6,6 +6,11 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Загрузка аватарки в настройках кабинета идёт через server action;
+    // дефолтный лимит тела (1 МБ) для фото с телефона мал.
+    serverActions: { bodySizeLimit: "5mb" },
+  },
   images: {
     // Next 16 отдаёт только те значения quality, что перечислены здесь.
     // 90 — для фото на воде: на 75 небо и брызги заметно рассыпаются.

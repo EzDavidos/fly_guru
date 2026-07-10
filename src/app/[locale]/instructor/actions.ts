@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppUser, type AppUser } from "@/lib/auth";
 import { phoneDigits, phonesMatch } from "@/lib/phone";
 import { vnToday, subscriptionExpiry } from "@/lib/dates";
@@ -333,4 +334,83 @@ export async function writeOffAction(
     left: String(left - minutes),
   });
   redirect(`/instructor/done?${params.toString()}`);
+}
+
+// ── Настройки профиля ────────────────────────────────────────────────────────
+// Форматы, которые умеет отдавать next/image; iPhone при таком accept сам
+// конвертирует HEIC в JPEG при выборе из галереи.
+const AVATAR_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+// Чуть меньше лимита тела server actions (5 МБ в next.config.ts), чтобы
+// остальные поля формы гарантированно влезли. Продублировано в SettingsForm
+// ("use server"-файл не может экспортировать константы).
+const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
+
+export async function updateProfileAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireStaff();
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Имя не может быть пустым." };
+
+  const ageRaw = String(formData.get("age") ?? "").trim();
+  const age = ageRaw ? Number(ageRaw) : null;
+  if (age !== null && (!Number.isInteger(age) || age < 14 || age > 99)) {
+    return { error: "Возраст — целое число от 14 до 99." };
+  }
+
+  // Цель вводят как «20 000 000» или «20.000.000» — выкидываем разделители.
+  const goalRaw = String(formData.get("monthly_goal") ?? "").replace(/[\s.,]/g, "");
+  if (goalRaw && !/^\d+$/.test(goalRaw)) {
+    return { error: "Цель по ЗП — число в донгах, например 20 000 000." };
+  }
+  const monthlyGoal = goalRaw ? Number(goalRaw) : null;
+
+  const patch: Record<string, unknown> = {
+    name,
+    age,
+    monthly_goal: monthlyGoal,
+  };
+
+  // На users нет политики «обновить свою строку» (и на бакет avatars нет
+  // политик записи) — профиль сознательно меняется только через сервер.
+  // Пишем под service_role, но строго в строку залогиненного пользователя.
+  const admin = createAdminClient();
+
+  const photo = formData.get("photo");
+  if (photo instanceof File && photo.size > 0) {
+    const ext = AVATAR_TYPES[photo.type];
+    if (!ext) return { error: "Фото — только JPG, PNG или WebP." };
+    if (photo.size > AVATAR_MAX_BYTES) {
+      return { error: "Фото больше 4 МБ. Выберите другое или сожмите." };
+    }
+
+    // Путь стабильный (одна аватарка на пользователя, upsert перезаписывает
+    // старую), а ?v= в сохранённом URL сбрасывает кеш браузера и next/image.
+    const path = `${user.id}.${ext}`;
+    const { error: uploadError } = await admin.storage
+      .from("avatars")
+      .upload(path, photo, { upsert: true, contentType: photo.type });
+    if (uploadError) {
+      return { error: `Не удалось загрузить фото: ${uploadError.message}` };
+    }
+
+    const { data: pub } = admin.storage.from("avatars").getPublicUrl(path);
+    patch.photo_url = `${pub.publicUrl}?v=${Date.now()}`;
+  }
+
+  const { error: updateError } = await admin
+    .from("users")
+    .update(patch)
+    .eq("id", user.id);
+  if (updateError) return { error: `Не удалось сохранить: ${updateError.message}` };
+
+  // Имя и фото видны на главном экране кабинета и в бейдже шапки.
+  revalidatePath("/", "layout");
+  redirect("/instructor");
 }
