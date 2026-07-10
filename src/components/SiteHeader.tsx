@@ -33,6 +33,12 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
+            href="/login"
+            className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+          >
+            Вход
+          </Link>
+          <Link
             href="/training#form"
             className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
           >
@@ -67,9 +73,16 @@ export function SiteHeader() {
               </Link>
             ))}
             <Link
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="py-3 text-muted hover:text-ink"
+            >
+              Вход в кабинет
+            </Link>
+            <Link
               href="/training#form"
               onClick={() => setOpen(false)}
-              className="mt-3 mb-2 rounded-full bg-accent px-5 py-3 text-center font-semibold text-white"
+              className="mt-2 mb-2 rounded-full bg-accent px-5 py-3 text-center font-semibold text-white"
             >
               Записаться
             </Link>
