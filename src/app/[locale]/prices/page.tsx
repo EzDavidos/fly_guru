@@ -44,7 +44,10 @@ export default function PricesPage() {
                             <Badge className="ml-2 align-middle">Члены клуба</Badge>
                           )}
                         </div>
-                        <div className="text-sm text-muted">{formatDuration(s)}</div>
+                        <div className="text-sm text-muted">
+                          {formatDuration(s)}
+                          {s.note && ` · ${s.note}`}
+                        </div>
                       </div>
                       <div className="whitespace-nowrap font-bold text-primary">
                         {formatVnd(s.price)}
@@ -58,9 +61,9 @@ export default function PricesPage() {
         </div>
 
         <div className="mt-8 space-y-1 text-sm text-muted">
-          <p>Экскурсия, путешествие и сафари — только для членов клуба, требуется базовое обучение.</p>
+          <p>Экскурсия и сафари — только для членов клуба, требуется базовое обучение.</p>
           <p>Абонемент выгоднее проката: окупается уже с 5-й каталки.</p>
-          {/* TODO: цена «путешествия» — сейчас «по запросу» */}
+          <p>Минуты абонемента действуют 3 месяца, остаток можно передать другу.</p>
         </div>
       </Container>
     </Section>

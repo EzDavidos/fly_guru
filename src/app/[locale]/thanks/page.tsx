@@ -16,8 +16,7 @@ export default function ThanksPage() {
           </div>
           <h1 className="text-3xl font-bold sm:text-4xl">Заявка принята!</h1>
           <p className="mt-4 text-lg text-muted">
-            {/* TODO: подтвердить срок ответа (например, «в течение 2 часов») */}
-            Спасибо! Мы получили вашу заявку и свяжемся с вами в ближайшее время,
+            Спасибо! Мы получили вашу заявку и свяжемся с вами в течение часа,
             чтобы подтвердить детали и удобное время.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">

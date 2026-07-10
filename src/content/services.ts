@@ -34,17 +34,24 @@ export const services: Service[] = [
   { id: "tandem-kid", name: "Тандем с инструктором (до 14 лет)", durationMin: 5, price: 500_000, category: "tandem" },
 
   // ── Выезды (только для членов клуба) ──
-  { id: "excursion", name: "Экскурсия вдоль побережья", durationMin: 120, price: 3_500_000, category: "tour", membersOnly: true },
   {
-    id: "journey",
-    name: "Путешествие (несколько локаций)",
+    id: "excursion",
+    name: "Экскурсия на остров Черепахи",
+    durationMin: 120,
+    price: 3_500_000,
+    category: "tour",
+    membersOnly: true,
+    note: "Вдвоём — по 3 000 000 ₫ с человека",
+  },
+  {
+    id: "safari",
+    name: "Сафари",
     durationMin: null,
-    durationLabel: "полдня",
-    price: null, // TODO: цена «путешествия»
+    durationLabel: "5–6 часов",
+    price: 6_000_000,
     category: "tour",
     membersOnly: true,
   },
-  { id: "safari", name: "Сафари", durationMin: null, durationLabel: "целый день", price: 6_000_000, category: "tour", membersOnly: true },
 
   // ── Прокат ──
   { id: "rental", name: "Самостоятельный прокат (после обучения)", durationMin: 30, price: 1_000_000, category: "rental" },
