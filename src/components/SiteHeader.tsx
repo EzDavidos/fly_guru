@@ -1,14 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { NAV_LINKS } from "./nav";
 
-// Шапка сайта. Клиентский компонент только ради переключения мобильного меню —
-// это единственный кусок JS в навигации, остальное статично.
+// Шапка сайта. Клиентский компонент ради мобильного меню и кнопки «Вход/Кабинет».
+//
+// Публичные страницы статические (SSG) — сервер не знает, кто залогинен.
+// Поэтому сессию проверяем в браузере после загрузки: supabase читает её из
+// куки локально, без похода в сеть. До проверки показываем «Вход» — у гостей
+// (99% посетителей) ничего не мигает.
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  // Куда ведёт кнопка кабинета: null = не залогинен (показываем «Вход»).
+  const [cabinetHref, setCabinetHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const role = session?.user.app_metadata?.role as string | undefined;
+      if (role) setCabinetHref(`/${role}`); // /admin, /instructor, /member, /agent
+    });
+  }, []);
+
+  const authHref = cabinetHref ?? "/login";
+  const authLabel = cabinetHref ? "Кабинет" : "Вход";
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface/90 backdrop-blur">
@@ -33,10 +51,10 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href="/login"
+            href={authHref}
             className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
           >
-            Вход
+            {authLabel}
           </Link>
           <Link
             href="/training#form"
@@ -73,11 +91,11 @@ export function SiteHeader() {
               </Link>
             ))}
             <Link
-              href="/login"
+              href={authHref}
               onClick={() => setOpen(false)}
               className="py-3 text-muted hover:text-ink"
             >
-              Вход в кабинет
+              {cabinetHref ? "Мой кабинет" : "Вход в кабинет"}
             </Link>
             <Link
               href="/training#form"

@@ -10,7 +10,7 @@ const TABS = [
   { href: "/instructor/record", label: "Записать" },
   { href: "/instructor/subscription", label: "Абонемент" },
   { href: "/instructor/writeoff", label: "Списание" },
-  { href: "/instructor/stats", label: "Моё" },
+  { href: "/instructor/stats", label: "Статистика" },
 ] as const;
 
 export function InstructorNav() {
