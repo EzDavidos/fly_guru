@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# исходники фото/видео (сотни МБ — GitHub такое не принимает, живут только локально)
+/photo_video/
+
 # vercel
 .vercel
 
