@@ -1,89 +1,209 @@
+import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
-import { vnCurrentMonth } from "@/lib/dates";
+import {
+  vnCurrentMonth,
+  vnPeriod,
+  vnPrevMonth,
+  vnShiftDays,
+  vnToday,
+} from "@/lib/dates";
+import { getInstructorStats, vnd, type StatsRange } from "@/lib/stats";
 
-// «Моя статистика» за текущий месяц: клиенты, выручка, ЗП.
-// Формула ЗП (архитектура, раздел 7): 10% от чеков моих сессий + 10% от
-// проданных мной абонементов, У КОТОРЫХ ЕСТЬ ОПЛАТА (paid_at не пуст).
-// Неоплаченные абонементы показываем отдельной строкой — в ЗП они не входят.
+// «Статистика» за произвольный период. По умолчанию — текущий месяц
+// (с 1-го числа); кнопка «Текущий месяц» всегда возвращает к нему, даже если
+// наклацал другие периоды. Каждый клиент — отдельный бар (сумма его чеков).
 
-const SALARY_RATE = 0.1;
+const CATEGORY_LABEL: Record<string, string> = {
+  training: "Обучение",
+  tandem: "Тандем",
+  rental: "Прокат",
+  tour: "Туры",
+  subscription: "Абонементы",
+  extra: "Дополнительно",
+  other: "Прочее",
+};
 
-function vnd(n: number): string {
-  return `${n.toLocaleString("ru-RU")} ₫`;
-}
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-export default async function StatsPage() {
+const presetClass = (active: boolean) =>
+  `rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+    active
+      ? "bg-primary text-white"
+      : "border border-line text-muted hover:border-primary hover:text-primary"
+  }`;
+
+export default async function StatsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string }>;
+}) {
   const user = await getAppUser();
   if (!user) return null; // layout уже средиректил бы; страховка для типов
 
-  const supabase = await createClient();
+  const { from, to } = await searchParams;
+  const today = vnToday();
   const month = vnCurrentMonth();
+  const prev = vnPrevMonth();
 
-  // Мои сессии за месяц. RLS и так отдаёт только мои + списания, но фильтруем
-  // явно: списания чужих клиентов в мою статистику попадать не должны.
-  const { data: sessions } = await supabase
-    .from("sessions")
-    .select("client_id, amount, minutes_used, subscription_id")
-    .eq("instructor_id", user.id)
-    .gte("date", month.fromDay)
-    .lt("date", month.toDay);
+  // Период из URL (обе даты включительно); мусор → текущий месяц.
+  const custom = Boolean(from && to && DAY_RE.test(from!) && DAY_RE.test(to!) && from! <= to!);
+  const range: StatsRange = custom ? vnPeriod(from!, to!) : month;
+  // Последний день периода включительно — для подписи и значений инпутов.
+  const lastDay = custom ? to! : vnShiftDays(month.toDay, -1);
+  const label = custom ? `${from} — ${to}` : month.label;
 
-  const rows = sessions ?? [];
-  const clients = new Set(rows.map((r) => r.client_id).filter(Boolean));
-  const revenue = rows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
-  const salaryFromSessions = revenue * SALARY_RATE;
+  const supabase = await createClient();
+  const stats = await getInstructorStats(supabase, user.id, range);
 
-  // Проданные мной абонементы. Оплаченные в этом месяце — в ЗП;
-  // неоплаченные (когда-либо) — отдельной строкой «ожидают оплату».
-  const { data: subs } = await supabase
-    .from("subscriptions")
-    .select("price, paid_at, sold_at")
-    .eq("sold_by", user.id);
-
-  const subRows = subs ?? [];
-  const paidThisMonth = subRows.filter(
-    (s) => s.paid_at && s.paid_at >= month.fromIso && s.paid_at < month.toIso,
-  );
-  const unpaid = subRows.filter((s) => !s.paid_at);
-
-  const paidSubsSum = paidThisMonth.reduce((s, r) => s + Number(r.price ?? 0), 0);
-  const unpaidSubsSum = unpaid.reduce((s, r) => s + Number(r.price ?? 0), 0);
-  const salaryFromSubs = paidSubsSum * SALARY_RATE;
-  const salary = salaryFromSessions + salaryFromSubs;
+  const maxAmount = Math.max(...stats.clientBars.map((b) => b.amount), 1);
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Моя статистика</h1>
-      <p className="mt-1 text-sm capitalize text-muted">{month.label}</p>
+      <h1 className="text-2xl font-bold">Статистика</h1>
+      <p className="mt-1 text-sm capitalize text-muted">{label}</p>
 
+      {/* Пресеты + свой период */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href="/instructor/stats" className={presetClass(!custom)}>
+          Текущий месяц
+        </Link>
+        <Link
+          href={`/instructor/stats?from=${prev.fromDay}&to=${prev.lastDay}`}
+          className={presetClass(custom && from === prev.fromDay && to === prev.lastDay)}
+        >
+          Прошлый месяц
+        </Link>
+        <Link
+          href={`/instructor/stats?from=${vnShiftDays(today, -6)}&to=${today}`}
+          className={presetClass(custom && from === vnShiftDays(today, -6) && to === today)}
+        >
+          7 дней
+        </Link>
+      </div>
+
+      <form className="mt-3 flex items-end gap-2" action="">
+        <label className="flex-1 text-xs text-muted">
+          С
+          <input
+            type="date"
+            name="from"
+            defaultValue={range.fromDay}
+            max={today}
+            className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </label>
+        <label className="flex-1 text-xs text-muted">
+          По
+          <input
+            type="date"
+            name="to"
+            defaultValue={lastDay}
+            max={today}
+            className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </label>
+        <button
+          type="submit"
+          className="rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+        >
+          Показать
+        </button>
+      </form>
+
+      {/* Главные цифры */}
       <div className="mt-6 grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="text-sm text-muted">Клиенты</p>
-          <p className="mt-1 text-3xl font-bold">{clients.size}</p>
+          <p className="mt-1 text-3xl font-bold">{stats.clientsCount}</p>
+        </div>
+        <div className="rounded-2xl border border-line bg-surface p-4">
+          <p className="text-sm text-muted">Занятий</p>
+          <p className="mt-1 text-3xl font-bold">{stats.sessionsCount}</p>
         </div>
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="text-sm text-muted">Выручка</p>
-          <p className="mt-1 text-xl font-bold">{vnd(revenue)}</p>
+          <p className="mt-1 text-lg font-bold">{vnd(stats.revenue)}</p>
+        </div>
+        <div className="rounded-2xl border border-line bg-surface p-4">
+          <p className="text-sm text-muted">Средний чек</p>
+          <p className="mt-1 text-lg font-bold">{vnd(stats.avgCheck)}</p>
         </div>
       </div>
 
+      {/* ЗП: 10% от чеков сессий + 10% от оплаченных абонементов */}
       <div className="mt-3 rounded-2xl border-2 border-primary bg-surface p-5">
-        <p className="text-sm text-muted">Моя ЗП за месяц</p>
-        <p className="mt-1 text-3xl font-bold text-primary">{vnd(Math.round(salary))}</p>
+        <p className="text-sm text-muted">Моя ЗП за период</p>
+        <p className="mt-1 text-3xl font-bold text-primary">{vnd(stats.salary)}</p>
         <div className="mt-3 space-y-1 text-sm text-muted">
-          <p>10% от сессий: {vnd(Math.round(salaryFromSessions))}</p>
+          <p>10% от сессий: {vnd(stats.salaryFromSessions)}</p>
           <p>
-            10% от оплаченных абонементов ({paidThisMonth.length} шт.):{" "}
-            {vnd(Math.round(salaryFromSubs))}
+            10% от оплаченных абонементов ({stats.paidSubsCount} шт.):{" "}
+            {vnd(stats.salaryFromSubs)}
           </p>
         </div>
       </div>
 
-      {unpaid.length > 0 && (
+      {stats.unpaidSubsCount > 0 && (
         <div className="mt-3 rounded-2xl border border-dashed border-line bg-surface p-4 text-sm text-muted">
-          Ожидают оплату — в ЗП не входят: {unpaid.length} абонемент(а) на{" "}
-          {vnd(unpaidSubsSum)}. Когда админ отметит оплату, 10% попадут в расчёт.
+          Ожидают оплату — в ЗП не входят: {stats.unpaidSubsCount} абонемент(а) на{" "}
+          {vnd(stats.unpaidSubsSum)}. Когда админ отметит оплату, 10% попадут в расчёт.
+        </div>
+      )}
+
+      {/* Каждый клиент — отдельный бар (сумма чеков за период) */}
+      {stats.clientBars.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-line bg-surface p-4">
+          <p className="font-bold">Клиенты за период</p>
+          <div className="mt-3 space-y-3">
+            {stats.clientBars.map((c) => (
+              <div key={c.clientId}>
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="min-w-0 truncate">{c.name}</span>
+                  <span className="shrink-0 font-semibold">
+                    {c.amount > 0 ? vnd(c.amount) : `${c.minutes} мин`}
+                  </span>
+                </div>
+                <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-line/50">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.max((c.amount / maxAmount) * 100, 2)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            Длина бара — сумма чеков клиента. Клиенты с абонементом (списания без
+            чека) показаны минутами.
+          </p>
+        </div>
+      )}
+
+      {/* Разбивка выручки по видам услуг + минуты */}
+      {(stats.byCategory.length > 0 || stats.minutesWrittenOff > 0) && (
+        <div className="mt-3 rounded-2xl border border-line bg-surface p-4">
+          <p className="font-bold">По видам услуг</p>
+          <div className="mt-2 space-y-1 text-sm text-muted">
+            {stats.byCategory.map((c) => (
+              <div key={c.category} className="flex justify-between">
+                <span>{CATEGORY_LABEL[c.category] ?? c.category}</span>
+                <span className="font-semibold text-ink">{vnd(c.amount)}</span>
+              </div>
+            ))}
+            {stats.minutesWrittenOff > 0 && (
+              <div className="flex justify-between">
+                <span>Списано минут с абонементов</span>
+                <span className="font-semibold text-ink">{stats.minutesWrittenOff} мин</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stats.sessionsCount === 0 && (
+        <div className="mt-6 rounded-2xl border border-line bg-surface p-6 text-center text-muted">
+          За этот период занятий не было. 🌊
         </div>
       )}
     </div>
