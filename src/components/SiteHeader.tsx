@@ -16,17 +16,37 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   // Куда ведёт кнопка кабинета: null = не залогинен (показываем «Вход»).
   const [cabinetHref, setCabinetHref] = useState<string | null>(null);
+  // Активные записи (подтверждены админом, никем не приняты) — красный
+  // кружочек на кнопке «Кабинет» у инструктора и админа.
+  const [activeCount, setActiveCount] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(({ data: { session } }) => {
       const role = session?.user.app_metadata?.role as string | undefined;
-      if (role) setCabinetHref(`/${role}`); // /admin, /instructor, /member, /agent
+      if (!role) return;
+      setCabinetHref(`/${role}`); // /admin, /instructor, /member, /agent
+
+      if (role === "instructor" || role === "admin") {
+        // RLS (bookings_select_staff) пропустит только персонал.
+        supabase
+          .from("bookings")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "confirmed")
+          .is("accepted_by", null)
+          .then(({ count }) => setActiveCount(count ?? 0));
+      }
     });
   }, []);
 
   const authHref = cabinetHref ?? "/login";
   const authLabel = cabinetHref ? "Кабинет" : "Вход";
+
+  const countBubble = activeCount > 0 && (
+    <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+      {activeCount}
+    </span>
+  );
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface/90 backdrop-blur">
@@ -52,9 +72,10 @@ export function SiteHeader() {
           ))}
           <Link
             href={authHref}
-            className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+            className="relative rounded-full border border-line px-4 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
           >
             {authLabel}
+            {countBubble}
           </Link>
           <Link
             href="/training#form"
@@ -96,6 +117,11 @@ export function SiteHeader() {
               className="py-3 text-muted hover:text-ink"
             >
               {cabinetHref ? "Мой кабинет" : "Вход в кабинет"}
+              {activeCount > 0 && (
+                <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                  {activeCount}
+                </span>
+              )}
             </Link>
             <Link
               href="/training#form"

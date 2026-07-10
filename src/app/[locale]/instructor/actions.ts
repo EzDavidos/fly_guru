@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser, type AppUser } from "@/lib/auth";
 import { phoneDigits, phonesMatch } from "@/lib/phone";
@@ -66,6 +67,43 @@ async function findOrCreateClient(
     return { error: `Не удалось создать клиента: ${insError?.message ?? "?"}` };
   }
   return { id: created.id };
+}
+
+// ── Записи (подтверждённые админом заявки) ───────────────────────────────────
+// «Принять»: запись закрепляется за мной. Условия .is("accepted_by", null) и
+// .eq("status", "confirmed") защищают от гонки — если двое нажали одновременно,
+// база возьмёт только первого, у второго update просто не найдёт строку.
+export async function acceptBookingAction(formData: FormData) {
+  const user = await requireStaff();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  await supabase
+    .from("bookings")
+    .update({ accepted_by: user.id, accepted_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "confirmed")
+    .is("accepted_by", null);
+
+  // Перерисовать счётчики (кнопка «Записи», бейдж в шапке) везде.
+  revalidatePath("/", "layout");
+}
+
+// «Отказаться»: вернуть запись в общий пул (только свою).
+export async function declineBookingAction(formData: FormData) {
+  const user = await requireStaff();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  await supabase
+    .from("bookings")
+    .update({ accepted_by: null, accepted_at: null })
+    .eq("id", id)
+    .eq("accepted_by", user.id);
+
+  revalidatePath("/", "layout");
 }
 
 // ── «Записать клиента» ────────────────────────────────────────────────────────

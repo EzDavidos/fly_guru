@@ -1,89 +1,129 @@
+import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui";
-import { vnToday } from "@/lib/dates";
+import { getAppUser } from "@/lib/auth";
+import { vnCurrentMonth } from "@/lib/dates";
+import { getInstructorStats, vnd } from "@/lib/stats";
+import { logoutAction } from "../login/actions";
 
-// Экран «Заявки»: что пришло с сайта и ждёт обработки — на сегодня и ближайшие дни.
+// Главный экран кабинета: карточка профиля (фото + главные цифры месяца +
+// цель по ЗП) и крупные кнопки-разделы. Сценарий — инструктор на пляже
+// с телефоном, всё должно нажиматься большим пальцем.
 
-const STATUS_LABEL: Record<string, string> = {
-  new: "Новая",
-  contacted: "На связи",
-  confirmed: "Подтверждена",
-};
-
-interface BookingRow {
-  id: string;
-  client_name: string;
-  phone: string;
-  preferred_date: string | null;
-  status: string;
-  ref_code: string | null;
-  internal_note: string | null;
-  services: { name: string } | null;
+// Красный кружочек-счётчик в углу кнопки «Записи».
+function CountBubble({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+      {count}
+    </span>
+  );
 }
 
-export default async function InstructorBookingsPage() {
+const tileClass =
+  "relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border border-line bg-surface p-4 text-sm font-semibold transition-colors hover:border-primary";
+
+export default async function InstructorHomePage() {
+  const user = await getAppUser();
+  if (!user) return null; // layout уже средиректил бы; страховка для типов
+
   const supabase = await createClient();
+  const month = vnCurrentMonth();
+  const stats = await getInstructorStats(supabase, user.id, month);
 
-  // Открытые заявки: свежие и с ближайшими датами. Прошедшие даты тоже
-  // показываем (их надо либо оформить, либо отменить в админке) — но ниже.
-  const { data } = await supabase
+  // Активные записи: подтверждены админом, ещё никем не приняты.
+  const { count } = await supabase
     .from("bookings")
-    .select(
-      "id, client_name, phone, preferred_date, status, ref_code, internal_note, services(name)",
-    )
-    .in("status", ["new", "contacted", "confirmed"])
-    .order("preferred_date", { ascending: true, nullsFirst: false })
-    .limit(50);
+    .select("id", { count: "exact", head: true })
+    .eq("status", "confirmed")
+    .is("accepted_by", null);
+  const activeCount = count ?? 0;
 
-  const bookings = (data ?? []) as unknown as BookingRow[];
-  const today = vnToday();
+  const goal = Number(user.monthly_goal ?? 0);
+  const progress = goal > 0 ? Math.min(100, (stats.salary / goal) * 100) : 0;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Заявки</h1>
-      <p className="mt-1 text-sm text-muted">
-        Открытые заявки с сайта. Провели занятие — жмите «Оформить».
-      </p>
-
-      {bookings.length === 0 && (
-        <div className="mt-8 rounded-2xl border border-line bg-surface p-6 text-center text-muted">
-          Открытых заявок нет. 🌊
-        </div>
-      )}
-
-      <div className="mt-6 space-y-3">
-        {bookings.map((b) => (
-          <div key={b.id} className="rounded-2xl border border-line bg-surface p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-bold">{b.client_name}</p>
-                <a href={`tel:${b.phone}`} className="text-sm text-primary underline">
-                  {b.phone}
-                </a>
-              </div>
-              <Badge>{STATUS_LABEL[b.status] ?? b.status}</Badge>
+      {/* Карточка профиля */}
+      <div className="rounded-2xl border border-line bg-surface p-5">
+        <div className="flex items-center gap-4">
+          {user.photo_url ? (
+            <Image
+              src={user.photo_url}
+              alt={user.name}
+              width={72}
+              height={72}
+              className="h-18 w-18 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-18 w-18 shrink-0 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
+              {user.name.trim().charAt(0).toUpperCase() || "?"}
             </div>
-
-            <div className="mt-2 space-y-0.5 text-sm text-muted">
-              {b.services?.name && <p>{b.services.name}</p>}
-              {b.preferred_date && (
-                <p>
-                  {b.preferred_date === today ? "Сегодня" : b.preferred_date}
-                </p>
-              )}
-              {b.ref_code && <p>Реф-код: {b.ref_code} (скидка 200 000 ₫ на базовое)</p>}
-              {b.internal_note && <p className="italic">{b.internal_note}</p>}
-            </div>
-
-            <Link
-              href={`/instructor/record?booking=${b.id}`}
-              className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
-            >
-              Оформить
-            </Link>
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-bold">{user.name}</p>
+            <p className="text-2xl font-bold text-primary">{vnd(stats.salary)}</p>
+            <p className="text-xs text-muted">
+              ЗП за {month.label} · клиентов: {stats.clientsCount}
+            </p>
           </div>
-        ))}
+        </div>
+
+        {goal > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-muted">
+              <span>Цель на месяц</span>
+              <span>
+                {vnd(stats.salary)} / {vnd(goal)}
+              </span>
+            </div>
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line/60">
+              <div
+                className="h-full rounded-full bg-accent"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Кнопки-разделы (порядок предварительный — поменять легко) */}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Link
+          href="/instructor/record"
+          className="col-span-2 flex min-h-20 items-center justify-center rounded-2xl bg-accent p-4 text-base font-bold text-white transition-colors hover:bg-accent-strong"
+        >
+          Записать клиента
+        </Link>
+
+        <Link href="/instructor/bookings" className={tileClass}>
+          <CountBubble count={activeCount} />
+          Записи
+          <span className="text-xs font-normal text-muted">от админа</span>
+        </Link>
+        <Link href="/instructor/stats" className={tileClass}>
+          Статистика
+          <span className="text-xs font-normal text-muted">за любой период</span>
+        </Link>
+
+        <Link href="/instructor/subscription" className={tileClass}>
+          Абонемент
+          <span className="text-xs font-normal text-muted">продажа</span>
+        </Link>
+        <Link href="/instructor/writeoff" className={tileClass}>
+          Списание
+          <span className="text-xs font-normal text-muted">минуты</span>
+        </Link>
+
+        <Link href="/instructor/settings" className={tileClass}>
+          Настройки
+          <span className="text-xs font-normal text-muted">имя · фото · цель</span>
+        </Link>
+        <form action={logoutAction} className="contents">
+          <button type="submit" className={`${tileClass} text-muted`}>
+            Выход
+          </button>
+        </form>
       </div>
     </div>
   );
