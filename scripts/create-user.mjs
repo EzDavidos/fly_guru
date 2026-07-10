@@ -14,12 +14,13 @@
 // Роль пишется в app_metadata JWT (быстрые проверки в middleware)
 // и в users.role (источник правды).
 //
+// Работает без библиотеки supabase-js (ей нужен Node 22+ из-за WebSocket) —
+// напрямую через HTTP API Supabase, хватает встроенного fetch (Node 18+).
 // Ключи берутся из .env.local (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).
 // ============================================================================
 
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { createClient } from "@supabase/supabase-js";
 
 // ── Читаем .env.local (простой парсер: KEY=VALUE построчно) ──
 function loadEnvLocal() {
@@ -71,33 +72,47 @@ if (!email) {
   process.exit(1);
 }
 
-// ── Создаём ──
-const supabase = createClient(url, serviceKey, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+// Общие заголовки: service_role — «серверный ключ-мастер», обходит RLS.
+const headers = {
+  apikey: serviceKey,
+  Authorization: `Bearer ${serviceKey}`,
+  "Content-Type": "application/json",
+};
 
-const { data: created, error: authError } = await supabase.auth.admin.createUser({
-  email,
-  password: args.password,
-  email_confirm: true, // подтверждение почты не нужно — аккаунты раздаём сами
-  app_metadata: { role: args.role },
-  user_metadata: { name: args.name },
+// ── Шаг 1: аккаунт в Supabase Auth (GoTrue Admin API) ──
+const authRes = await fetch(`${url}/auth/v1/admin/users`, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({
+    email,
+    password: args.password,
+    email_confirm: true, // подтверждение почты не нужно — аккаунты раздаём сами
+    app_metadata: { role: args.role },
+    user_metadata: { name: args.name },
+  }),
 });
-if (authError) {
-  console.error("Ошибка auth:", authError.message);
+const authBody = await authRes.json().catch(() => ({}));
+if (!authRes.ok || !authBody.id) {
+  console.error("Ошибка auth:", authBody.msg ?? authBody.message ?? authRes.status);
   process.exit(1);
 }
 
-const { error: dbError } = await supabase.from("users").insert({
-  role: args.role,
-  name: args.name,
-  phone: phoneDigits || null,
-  email,
-  auth_id: created.user.id,
+// ── Шаг 2: строка в таблице users (PostgREST) ──
+const dbRes = await fetch(`${url}/rest/v1/users`, {
+  method: "POST",
+  headers: { ...headers, Prefer: "return=minimal" },
+  body: JSON.stringify({
+    role: args.role,
+    name: args.name,
+    phone: phoneDigits || null,
+    email,
+    auth_id: authBody.id,
+  }),
 });
-if (dbError) {
-  console.error("Auth-аккаунт создан, но запись в users не удалась:", dbError.message);
-  console.error("Удалите пользователя в Supabase-дашборде и попробуйте снова.");
+if (!dbRes.ok) {
+  const err = await dbRes.text();
+  console.error("Auth-аккаунт создан, но запись в users не удалась:", err);
+  console.error("Удалите пользователя в Supabase-дашборде (Authentication → Users) и попробуйте снова.");
   process.exit(1);
 }
 
