@@ -1,9 +1,81 @@
-import createMiddleware from "next-intl/middleware";
+import createIntlMiddleware from "next-intl/middleware";
+import { createServerClient } from "@supabase/ssr";
+import { NextRequest, NextResponse } from "next/server";
 import { routing } from "./i18n/routing";
 
-// Middleware next-intl: разбирает язык из URL, при необходимости редиректит
-// и переписывает путь на внутренний сегмент [locale].
-export default createMiddleware(routing);
+// Middleware делает две вещи:
+// 1. next-intl: разбирает язык из URL и переписывает путь на сегмент [locale];
+// 2. защита кабинетов: /admin, /instructor, /member, /agent доступны только
+//    залогиненным пользователям с подходящей ролью (роль читается из JWT —
+//    app_metadata.role, без запроса в базу). Админ может заходить в любой кабинет.
+//
+// Это первый рубеж (быстрый редирект). Второй — requireRole в layout'ах
+// кабинетов, третий — RLS в самой базе. Даже если один слой обойти,
+// данные защищают остальные.
+
+const intlMiddleware = createIntlMiddleware(routing);
+
+const PROTECTED = new Set(["admin", "instructor", "member", "agent"]);
+
+// Убирает языковой префикс: '/en/instructor' → '/instructor', '/instructor' → как есть.
+function stripLocale(pathname: string): string {
+  const seg = pathname.split("/")[1];
+  if ((routing.locales as readonly string[]).includes(seg)) {
+    return pathname.slice(seg.length + 1) || "/";
+  }
+  return pathname;
+}
+
+export default async function middleware(request: NextRequest) {
+  const response = intlMiddleware(request);
+
+  // next-intl сам решил средиректить (смена языка и т.п.) — не вмешиваемся,
+  // на следующем запросе middleware отработает снова.
+  if (response.headers.has("location")) return response;
+
+  const path = stripLocale(request.nextUrl.pathname);
+  const section = path.split("/")[1];
+  if (!PROTECTED.has(section)) return response;
+
+  // Supabase-клиент, привязанный к кукам запроса. Обновлённые токены
+  // записываем и в request (для страницы ниже), и в response (для браузера).
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", path);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const role = (user.app_metadata?.role as string | undefined) ?? "";
+  if (role !== section && role !== "admin") {
+    // Чужой кабинет: отправляем в свой (или на логин, если роль не проставлена).
+    const home = PROTECTED.has(role) ? `/${role}` : "/login";
+    return NextResponse.redirect(new URL(home, request.url));
+  }
+
+  return response;
+}
 
 export const config = {
   // Прогоняем через middleware всё, кроме служебных путей Next и файлов с расширением.
