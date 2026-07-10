@@ -27,21 +27,24 @@ const actionButton =
   "inline-flex w-full items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition-colors";
 
 export default async function InstructorBookingsPage() {
-  const user = await getAppUser();
-  if (!user) return null; // layout уже средиректил бы; страховка для типов
-
   const supabase = await createClient();
   const today = vnToday();
 
-  const { data } = await supabase
-    .from("bookings")
-    .select(
-      "id, client_name, phone, preferred_date, scheduled_time, age, weight, pinned, internal_note, accepted_by, services(name), accepted:users!accepted_by(name)",
-    )
-    .eq("status", "confirmed")
-    .order("pinned", { ascending: false })
-    .order("preferred_date", { ascending: true, nullsFirst: false })
-    .limit(50);
+  // Профиль и список записей не зависят друг от друга — грузим параллельно,
+  // а не по очереди (каждый поход к базе в другом регионе стоит ~200 мс).
+  const [user, { data }] = await Promise.all([
+    getAppUser(),
+    supabase
+      .from("bookings")
+      .select(
+        "id, client_name, phone, preferred_date, scheduled_time, age, weight, pinned, internal_note, accepted_by, services(name), accepted:users!accepted_by(name)",
+      )
+      .eq("status", "confirmed")
+      .order("pinned", { ascending: false })
+      .order("preferred_date", { ascending: true, nullsFirst: false })
+      .limit(50),
+  ]);
+  if (!user) return null; // layout уже средиректил бы; страховка для типов
 
   const bookings = (data ?? []) as unknown as BookingRow[];
 

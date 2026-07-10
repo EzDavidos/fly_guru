@@ -29,14 +29,17 @@ export default async function InstructorHomePage() {
 
   const supabase = await createClient();
   const month = vnCurrentMonth();
-  const stats = await getInstructorStats(supabase, user.id, month);
 
-  // Активные записи: подтверждены админом, ещё никем не приняты.
-  const { count } = await supabase
-    .from("bookings")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "confirmed")
-    .is("accepted_by", null);
+  // Статистика и счётчик активных записей независимы — грузим параллельно.
+  const [stats, { count }] = await Promise.all([
+    getInstructorStats(supabase, user.id, month),
+    // Активные записи: подтверждены админом, ещё никем не приняты.
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "confirmed")
+      .is("accepted_by", null),
+  ]);
   const activeCount = count ?? 0;
 
   const goal = Number(user.monthly_goal ?? 0);

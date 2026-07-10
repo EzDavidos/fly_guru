@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,7 +30,10 @@ export const ROLE_HOME: Record<AppRole, string> = {
 };
 
 // Возвращает пользователя приложения или null (не залогинен / нет строки в users).
-export async function getAppUser(): Promise<AppUser | null> {
+// cache(): layout и страница вызывают getAppUser в одном запросе — без кеша это
+// два похода в Supabase Auth + два чтения users (по ~200+ мс каждый, база в
+// другом регионе). С кешом результат в рамках одного HTTP-запроса общий.
+export const getAppUser = cache(async (): Promise<AppUser | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -45,7 +49,7 @@ export async function getAppUser(): Promise<AppUser | null> {
   if (!data) return null;
 
   return data as AppUser;
-}
+});
 
 // Защита страницы кабинета: не залогинен → на /login (с возвратом обратно),
 // чужая роль → в свой кабинет. Админ может заходить в любой кабинет.
