@@ -111,7 +111,10 @@ export default async function AdminHomePage() {
           Сессии
           <span className="text-xs font-normal text-muted">занятия · задним числом</span>
         </Link>
-        <SoonTile label="Абонементы" />
+        <Link href="/admin/subscriptions" className={tileClass}>
+          Абонементы
+          <span className="text-xs font-normal text-muted">оплаты · минуты</span>
+        </Link>
 
         <SoonTile label="Клиенты" />
         <SoonTile label="Агенты" />

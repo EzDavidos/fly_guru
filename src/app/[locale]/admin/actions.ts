@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
 import { phoneDigits, phonesMatch } from "@/lib/phone";
+import { subscriptionExpiry } from "@/lib/dates";
+import { minutesLeft } from "@/lib/subscriptions";
 import { sendInstructorsBookingAlert } from "@/lib/telegram";
 import type { ActionState } from "../instructor/actions";
 
@@ -120,6 +122,52 @@ function parseVnd(raw: FormDataEntryValue | null): number | null {
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Дата 'YYYY-MM-DD' из формы → момент timestamptz. Берём полночь UTC = 7 утра
+// в Нячанге: дата остаётся «своим» днём и в UTC, и по местному времени.
+function dayToIso(day: string): string {
+  return new Date(`${day}T00:00:00Z`).toISOString();
+}
+
+// Клиент из формы: существующий (select clientId) ИЛИ новый по имени+телефону.
+// Перед созданием ищем по телефону — та же логика гибкого сравнения цифр,
+// что у инструктора, чтобы не плодить дублей из-за «+84» против «84».
+async function resolveClient(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  adminId: string,
+  formData: FormData,
+): Promise<{ id: string } | { error: string }> {
+  const clientId = String(formData.get("clientId") ?? "");
+  if (clientId) return { id: clientId };
+
+  const name = String(formData.get("newName") ?? "").trim();
+  const phone = String(formData.get("newPhone") ?? "").trim();
+  if (!name || !phone) {
+    return { error: "Выберите клиента из списка или заполните имя и телефон нового." };
+  }
+  const { data: existing } = await supabase
+    .from("clients")
+    .select("id, phone")
+    .not("phone", "is", null)
+    .limit(1000);
+  const match = (existing ?? []).find((c) => phonesMatch(c.phone, phone));
+  if (match) return { id: match.id };
+
+  const { data: created, error } = await supabase
+    .from("clients")
+    .insert({
+      name,
+      phone: phoneDigits(phone) || phone,
+      source: "offline",
+      created_by: adminId,
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    return { error: `Не удалось создать клиента: ${error?.message ?? "?"}` };
+  }
+  return { id: created.id };
+}
+
 // Создать сессию задним числом: инструктор забыл оформить занятие — админ
 // вносит его вручную на любую дату. Чек фиксируется в момент создания
 // (изменение прайса в будущем прошлые сессии не трогает).
@@ -139,41 +187,9 @@ export async function createSessionAction(
     return { error: "Выберите услугу и инструктора." };
   }
 
-  // Клиент: существующий из списка ИЛИ новый (имя + телефон). Перед созданием
-  // ищем по телефону — та же логика гибкого сравнения цифр, что у инструктора,
-  // чтобы не плодить дублей из-за «+84» против «84» и пробелов.
-  let clientId = String(formData.get("clientId") ?? "");
-  if (!clientId) {
-    const name = String(formData.get("newName") ?? "").trim();
-    const phone = String(formData.get("newPhone") ?? "").trim();
-    if (!name || !phone) {
-      return { error: "Выберите клиента из списка или заполните имя и телефон нового." };
-    }
-    const { data: existing } = await supabase
-      .from("clients")
-      .select("id, phone")
-      .not("phone", "is", null)
-      .limit(1000);
-    const match = (existing ?? []).find((c) => phonesMatch(c.phone, phone));
-    if (match) {
-      clientId = match.id;
-    } else {
-      const { data: created, error } = await supabase
-        .from("clients")
-        .insert({
-          name,
-          phone: phoneDigits(phone) || phone,
-          source: "offline",
-          created_by: admin.id,
-        })
-        .select("id")
-        .single();
-      if (error || !created) {
-        return { error: `Не удалось создать клиента: ${error?.message ?? "?"}` };
-      }
-      clientId = created.id;
-    }
-  }
+  const clientRes = await resolveClient(supabase, admin.id, formData);
+  if ("error" in clientRes) return clientRes;
+  const clientId = clientRes.id;
 
   const { data: service } = await supabase
     .from("services")
@@ -224,6 +240,127 @@ export async function updateSessionAction(formData: FormData) {
   const { error } = await supabase.from("sessions").update(patch).eq("id", id);
   if (error) console.error("[admin] session update error:", error.message);
   revalidatePath("/", "layout");
+}
+
+// ── Абонементы (подэтап 4.3) ─────────────────────────────────────────────────
+// Продажа от админа: как у инструктора, но продавца выбираем (его 10% комиссия
+// после оплаты) и дату можно поставить прошлую. Цена по умолчанию — 6 000 000 ₫.
+export async function adminSellSubscriptionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const supabase = await createClient();
+
+  const sellerId = String(formData.get("sellerId") ?? "");
+  if (!sellerId) return { error: "Укажите, кто продал абонемент." };
+
+  const soldDay = String(formData.get("soldDate") ?? "").trim();
+  if (!DAY_RE.test(soldDay)) return { error: "Укажите дату продажи." };
+  const soldAt = dayToIso(soldDay);
+
+  const priceRaw = String(formData.get("price") ?? "").trim();
+  const price = priceRaw ? parseVnd(priceRaw) : 6_000_000;
+  if (price === null) return { error: "Цена — число в донгах, например 6 000 000." };
+
+  const clientRes = await resolveClient(supabase, admin.id, formData);
+  if ("error" in clientRes) return clientRes;
+  const clientId = clientRes.id;
+
+  // Минуты живут 3 месяца С ДАТЫ ПРОДАЖИ (в т.ч. прошлой). paid_at — только
+  // при полученной оплате: от месяца оплаты зависят выручка и комиссия.
+  const paid = formData.get("paid") === "on";
+  const { error: subError } = await supabase.from("subscriptions").insert({
+    client_id: clientId,
+    sold_by: sellerId,
+    price,
+    sold_at: soldAt,
+    expires_at: subscriptionExpiry(new Date(soldAt)).toISOString(),
+    paid_at: paid ? soldAt : null,
+  });
+  if (subError) return { error: `Не удалось создать абонемент: ${subError.message}` };
+
+  // Первый абонемент делает клиента членом клуба (как у инструктора).
+  const { data: membership } = await supabase
+    .from("memberships")
+    .select("id")
+    .eq("client_id", clientId)
+    .maybeSingle();
+  if (!membership) {
+    const { error: memError } = await supabase
+      .from("memberships")
+      .insert({ client_id: clientId });
+    if (memError) console.error("[admin] membership insert error:", memError.message);
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/admin/subscriptions");
+}
+
+// Тумблер оплаты. Поставить — с датой (по умолчанию сегодня; месяц оплаты
+// решает, куда упадут выручка и комиссия). Снять — подтверждение на клиенте:
+// отметка уже могла войти в расчёты.
+export async function togglePaidAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  let paidAt: string | null = null;
+  if (formData.get("set") === "1") {
+    const day = String(formData.get("paidDate") ?? "").trim();
+    paidAt = DAY_RE.test(day) ? dayToIso(day) : new Date().toISOString();
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ paid_at: paidAt })
+    .eq("id", id);
+  if (error) console.error("[admin] paid toggle error:", error.message);
+  revalidatePath("/", "layout");
+}
+
+// Ручная корректировка минут: только с комментарием (почему), пишется в лог
+// subscription_adjustments от имени админа. Может вернуть абонемент из
+// used_up в active (и наоборот), но не воскрешает истёкший.
+export async function adjustMinutesAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const supabase = await createClient();
+
+  const subId = String(formData.get("subscriptionId") ?? "");
+  const delta = Math.trunc(Number(formData.get("delta")));
+  const comment = String(formData.get("comment") ?? "").trim();
+  if (!subId || !Number.isFinite(delta) || delta === 0) {
+    return { error: "Минуты — целое число, не ноль (например 30 или −15)." };
+  }
+  if (!comment) return { error: "Комментарий обязателен: почему меняем минуты." };
+
+  const { error } = await supabase.from("subscription_adjustments").insert({
+    subscription_id: subId,
+    delta_minutes: delta,
+    comment,
+    created_by: admin.id,
+  });
+  if (error) return { error: `Не удалось сохранить корректировку: ${error.message}` };
+
+  // Пересчёт статуса: минуты кончились ↔ снова появились.
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("id, total_minutes, status")
+    .eq("id", subId)
+    .maybeSingle();
+  if (sub && (sub.status === "active" || sub.status === "used_up")) {
+    const left = await minutesLeft(supabase, sub);
+    const next = left <= 0 ? "used_up" : "active";
+    if (next !== sub.status) {
+      await supabase.from("subscriptions").update({ status: next }).eq("id", subId);
+    }
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/admin/subscriptions");
 }
 
 // «Перенести»: новая дата/время, статус живой — в ленте появится бейдж

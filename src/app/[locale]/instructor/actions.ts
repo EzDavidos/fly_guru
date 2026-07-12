@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppUser, type AppUser } from "@/lib/auth";
 import { phoneDigits, phonesMatch } from "@/lib/phone";
 import { vnToday, subscriptionExpiry } from "@/lib/dates";
+import { minutesLeft } from "@/lib/subscriptions";
 
 // Server actions кабинета инструктора. Общий принцип безопасности:
 // instructor_id / sold_by / created_by берутся из СЕССИИ на сервере (user.id),
@@ -297,14 +298,9 @@ export async function writeOffAction(
     return { error: "Абонемент истёк (минуты живут 3 месяца). Продайте новый." };
   }
 
-  // Остаток = всего минус все списания (в т.ч. другими инструкторами —
-  // политика sessions_select_instructor такие сессии видеть разрешает).
-  const { data: used } = await supabase
-    .from("sessions")
-    .select("minutes_used")
-    .eq("subscription_id", sub.id);
-  const usedMinutes = (used ?? []).reduce((s, r) => s + (r.minutes_used ?? 0), 0);
-  const left = sub.total_minutes - usedMinutes;
+  // Остаток = всего + ручные корректировки админа − все списания (в т.ч.
+  // другими инструкторами — RLS такие сессии и корректировки видеть разрешает).
+  const left = await minutesLeft(supabase, sub);
 
   if (minutes > left) {
     return {
