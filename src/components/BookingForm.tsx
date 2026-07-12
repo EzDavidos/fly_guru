@@ -60,8 +60,10 @@ export function BookingForm({ services, defaultServiceId, refCode }: BookingForm
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("request failed");
-      // Успех — уводим на страницу «спасибо».
-      router.push("/thanks");
+      // Успех — уводим на страницу «спасибо» (с номером заявки, если сервер
+      // его вернул: клиент сможет назвать номер при созвоне).
+      const { bookingNo } = (await res.json()) as { bookingNo?: number | null };
+      router.push(bookingNo ? `/thanks?no=${bookingNo}` : "/thanks");
     } catch {
       setStatus("error");
     }

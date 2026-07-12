@@ -29,12 +29,15 @@ export function SiteHeader() {
 
       if (role === "instructor" || role === "admin") {
         // RLS (bookings_select_staff) пропустит только персонал.
-        supabase
+        // Инструктору важны непринятые записи, админу — свежие заявки с сайта.
+        let q = supabase
           .from("bookings")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "confirmed")
-          .is("accepted_by", null)
-          .then(({ count }) => setActiveCount(count ?? 0));
+          .select("id", { count: "exact", head: true });
+        q =
+          role === "admin"
+            ? q.eq("status", "new")
+            : q.eq("status", "confirmed").is("accepted_by", null);
+        q.then(({ count }) => setActiveCount(count ?? 0));
       }
     });
   }, []);

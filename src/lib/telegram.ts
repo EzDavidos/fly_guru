@@ -43,18 +43,48 @@ export async function sendBookingNotification(
   if (b.refCode) lines.push(`🎟️ Реф-код: ${b.refCode}`);
   if (b.src) lines.push(`🧭 Источник: ${b.src}`);
 
+  await sendTelegram(chatId, lines.join("\n"));
+}
+
+// Уведомление в группу ИНСТРУКТОРОВ: админ подтвердил заявку → появилась
+// запись, которую можно принять на сайте. Телефон клиента намеренно не шлём
+// в общий чат — его увидит тот, кто примет запись в кабинете.
+export async function sendInstructorsBookingAlert(b: {
+  bookingNo: number | null;
+  serviceName: string | null;
+  scheduledTime: string | null;
+  preferredDate: string | null;
+}): Promise<void> {
+  const chatId = process.env.TELEGRAM_INSTRUCTORS_CHAT_ID;
+  if (!chatId) return; // группа ещё не подключена — тихо выходим
+
+  const lines = [
+    `🟢 Новая запись${b.bookingNo ? ` #${b.bookingNo}` : ""}`,
+    "",
+  ];
+  if (b.serviceName) lines.push(`📋 ${b.serviceName}`);
+  if (b.preferredDate) lines.push(`📅 ${b.preferredDate}`);
+  if (b.scheduledTime) lines.push(`🕐 ${b.scheduledTime}`);
+  lines.push("", "Принять: https://fly-guru.vercel.app/instructor/bookings");
+
+  await sendTelegram(chatId, lines.join("\n"));
+}
+
+// Общая отправка простым текстом (без Markdown — надёжнее, ничего не надо
+// экранировать). Ошибки глотаем: уведомление — дополнение, не звено процесса.
+async function sendTelegram(chatId: string, text: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: lines.join("\n"),
-      }),
-      // Не ждём вечно: если Telegram недоступен, не держим ответ заявки.
+      body: JSON.stringify({ chat_id: chatId, text }),
+      // Не ждём вечно: если Telegram недоступен, не держим ответ.
       signal: AbortSignal.timeout(4000),
     });
   } catch {
-    // Telegram недоступен/таймаут — не роняем заявку из-за уведомления.
+    // Telegram недоступен/таймаут — не роняем операцию из-за уведомления.
   }
 }

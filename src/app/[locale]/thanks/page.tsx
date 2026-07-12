@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Container, Section, Button } from "@/components/ui";
+import { BookingNo } from "./BookingNo";
 
 export const metadata: Metadata = { title: "Заявка принята" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
@@ -15,6 +16,7 @@ export default function ThanksPage() {
             ✅
           </div>
           <h1 className="text-3xl font-bold sm:text-4xl">Заявка принята!</h1>
+          <BookingNo />
           <p className="mt-4 text-lg text-muted">
             Спасибо! Мы получили вашу заявку и свяжемся с вами в течение часа,
             чтобы подтвердить детали и удобное время.

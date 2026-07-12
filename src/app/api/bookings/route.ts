@@ -71,23 +71,32 @@ export async function POST(req: NextRequest) {
   const src = body.src?.trim() || null;
   const utm = body.utm && typeof body.utm === "object" ? body.utm : {};
 
-  // Предпочтительный канал связи храним в internal_note (заметка для менеджера) —
-  // отдельной колонки под мессенджер в схеме нет, а знать канал полезно.
-  const internalNote = messenger ? `Предпочтительная связь: ${messenger}` : null;
+  // Канал связи и комментарий клиента кладём в internal_note (стартовая
+  // заметка для админа; дальше он ведёт в ней договорённости с клиентом).
+  // Отдельных колонок в схеме нет, а терять пожелания клиента нельзя.
+  const noteParts: string[] = [];
+  if (messenger) noteParts.push(`Связь: ${messenger}`);
+  if (comment) noteParts.push(`Клиент: ${comment}`);
+  const internalNote = noteParts.join(" · ") || null;
 
   const supabase = createAdminClient();
 
   // 4. Запись заявки. status по умолчанию 'new' (задан в схеме).
-  const { error } = await supabase.from("bookings").insert({
-    client_name: clientName,
-    phone: contact,
-    service_id: serviceId,
-    preferred_date: preferredDate,
-    ref_code: refCode,
-    src,
-    utm,
-    internal_note: internalNote,
-  });
+  // Сразу забираем присвоенный номер — покажем его клиенту на /thanks.
+  const { data: created, error } = await supabase
+    .from("bookings")
+    .insert({
+      client_name: clientName,
+      phone: contact,
+      service_id: serviceId,
+      preferred_date: preferredDate,
+      ref_code: refCode,
+      src,
+      utm,
+      internal_note: internalNote,
+    })
+    .select("booking_no")
+    .single();
 
   if (error) {
     console.error("[bookings] insert error:", error.message);
@@ -116,5 +125,5 @@ export async function POST(req: NextRequest) {
     comment,
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, bookingNo: created?.booking_no ?? null });
 }
