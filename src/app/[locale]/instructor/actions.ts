@@ -165,6 +165,11 @@ export async function recordClientAction(
     .eq("id", serviceId)
     .maybeSingle();
   if (!service) return { error: "Услуга не найдена." };
+  // Абонемент сессией не оформить: без своей формы клиент не получит минуты,
+  // членство и отметку оплаты. Дубль-защита к фильтру списка на странице.
+  if (service.category === "subscription") {
+    return { error: "Абонемент оформляется через «Продажу абонемента»." };
+  }
 
   // Чек. Скидка по реф-ссылке действует только на базовое обучение.
   let amount = Number(service.price ?? 0);

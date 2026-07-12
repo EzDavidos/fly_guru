@@ -15,10 +15,13 @@ export default async function RecordPage({
   const supabase = await createClient();
 
   // Услуги из базы: форма отправляет uuid услуги, цена подставится на сервере.
+  // Без категории subscription: абонемент — не сессия, он продаётся через
+  // «Продажу абонемента» (иначе клиент не получит минуты и членство).
   const { data: services } = await supabase
     .from("services")
     .select("id, name")
     .eq("active", true)
+    .neq("category", "subscription")
     .order("price", { ascending: true, nullsFirst: false });
 
   let prefill: RecordPrefill | undefined;

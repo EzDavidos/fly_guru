@@ -168,10 +168,13 @@ export default async function AdminSessionsPage({
       .order("created_at", { ascending: false })
       .limit(300),
     supabase.from("clients").select("id, name, phone").order("name").limit(1000),
+    // Без категории subscription: абонемент — не сессия, у него своя форма
+    // с минутами, членством и тумблером оплаты (/admin/subscriptions).
     supabase
       .from("services")
       .select("id, name, price")
       .eq("active", true)
+      .neq("category", "subscription")
       .order("name"),
     supabase.from("users").select("id, name").in("role", ["instructor", "admin"]).order("name"),
   ]);

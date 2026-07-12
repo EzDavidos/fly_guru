@@ -193,10 +193,15 @@ export async function createSessionAction(
 
   const { data: service } = await supabase
     .from("services")
-    .select("price")
+    .select("price, category")
     .eq("id", serviceId)
     .maybeSingle();
   if (!service) return { error: "Услуга не найдена." };
+  // Абонемент сессией не оформить: без своей формы клиент не получит минуты,
+  // членство и отметку оплаты. Дубль-защита к фильтру списка на странице.
+  if (service.category === "subscription") {
+    return { error: "Абонемент оформляется на вкладке «Абонементы»." };
+  }
 
   // Пустая сумма = по прайсу; введённая вручную — важнее (скидки, брони и т.п.).
   const amountRaw = String(formData.get("amount") ?? "").trim();
@@ -232,11 +237,19 @@ export async function updateSessionAction(formData: FormData) {
   if (amount !== null) patch.amount = amount;
   const instructorId = String(formData.get("instructorId") ?? "");
   if (instructorId) patch.instructor_id = instructorId;
-  const serviceId = String(formData.get("serviceId") ?? "");
-  if (serviceId) patch.service_id = serviceId;
-  if (Object.keys(patch).length === 0) return;
 
   const supabase = await createClient();
+  const serviceId = String(formData.get("serviceId") ?? "");
+  if (serviceId) {
+    // Ту же сессию нельзя ПЕРЕДЕЛАТЬ в абонемент — см. createSessionAction.
+    const { data: svc } = await supabase
+      .from("services")
+      .select("category")
+      .eq("id", serviceId)
+      .maybeSingle();
+    if (svc && svc.category !== "subscription") patch.service_id = serviceId;
+  }
+  if (Object.keys(patch).length === 0) return;
   const { error } = await supabase.from("sessions").update(patch).eq("id", id);
   if (error) console.error("[admin] session update error:", error.message);
   revalidatePath("/", "layout");
