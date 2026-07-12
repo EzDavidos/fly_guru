@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
+import { phoneDigits, phonesMatch } from "@/lib/phone";
 import { sendInstructorsBookingAlert } from "@/lib/telegram";
+import type { ActionState } from "../instructor/actions";
 
 // Server actions админки: полный цикл заявки. Админ созванивается с гостем,
 // вносит время/возраст/вес и подтверждает — заявка становится «записью»,
@@ -106,6 +108,122 @@ export async function setStatusAction(formData: FormData) {
   }
   await updateBooking(id, patch);
   if (status === "confirmed") await notifyInstructors(id).catch(() => {});
+}
+
+// ── Сессии (подэтап 4.2) ─────────────────────────────────────────────────────
+// Сумма и дата в форме — как их вводит человек: «1 500 000», «1.500.000».
+function parseVnd(raw: FormDataEntryValue | null): number | null {
+  const s = String(raw ?? "").replace(/[\s.,]/g, "");
+  if (!s || !/^\d+$/.test(s)) return null;
+  return Number(s);
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Создать сессию задним числом: инструктор забыл оформить занятие — админ
+// вносит его вручную на любую дату. Чек фиксируется в момент создания
+// (изменение прайса в будущем прошлые сессии не трогает).
+export async function createSessionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const supabase = await createClient();
+
+  const date = String(formData.get("date") ?? "").trim();
+  if (!DAY_RE.test(date)) return { error: "Укажите дату сессии." };
+
+  const serviceId = String(formData.get("serviceId") ?? "");
+  const instructorId = String(formData.get("instructorId") ?? "");
+  if (!serviceId || !instructorId) {
+    return { error: "Выберите услугу и инструктора." };
+  }
+
+  // Клиент: существующий из списка ИЛИ новый (имя + телефон). Перед созданием
+  // ищем по телефону — та же логика гибкого сравнения цифр, что у инструктора,
+  // чтобы не плодить дублей из-за «+84» против «84» и пробелов.
+  let clientId = String(formData.get("clientId") ?? "");
+  if (!clientId) {
+    const name = String(formData.get("newName") ?? "").trim();
+    const phone = String(formData.get("newPhone") ?? "").trim();
+    if (!name || !phone) {
+      return { error: "Выберите клиента из списка или заполните имя и телефон нового." };
+    }
+    const { data: existing } = await supabase
+      .from("clients")
+      .select("id, phone")
+      .not("phone", "is", null)
+      .limit(1000);
+    const match = (existing ?? []).find((c) => phonesMatch(c.phone, phone));
+    if (match) {
+      clientId = match.id;
+    } else {
+      const { data: created, error } = await supabase
+        .from("clients")
+        .insert({
+          name,
+          phone: phoneDigits(phone) || phone,
+          source: "offline",
+          created_by: admin.id,
+        })
+        .select("id")
+        .single();
+      if (error || !created) {
+        return { error: `Не удалось создать клиента: ${error?.message ?? "?"}` };
+      }
+      clientId = created.id;
+    }
+  }
+
+  const { data: service } = await supabase
+    .from("services")
+    .select("price")
+    .eq("id", serviceId)
+    .maybeSingle();
+  if (!service) return { error: "Услуга не найдена." };
+
+  // Пустая сумма = по прайсу; введённая вручную — важнее (скидки, брони и т.п.).
+  const amountRaw = String(formData.get("amount") ?? "").trim();
+  const amount = amountRaw ? parseVnd(amountRaw) : Number(service.price ?? 0);
+  if (amount === null) return { error: "Сумма — число в донгах, например 1 500 000." };
+
+  const { error: insError } = await supabase.from("sessions").insert({
+    client_id: clientId,
+    service_id: serviceId,
+    instructor_id: instructorId,
+    date,
+    amount,
+    created_by: admin.id,
+  });
+  if (insError) return { error: `Не удалось создать сессию: ${insError.message}` };
+
+  // Сессия влияет на выручку, статистику и ЗП — перерисовываем всё.
+  revalidatePath("/", "layout");
+  redirect("/admin/sessions");
+}
+
+// Правка сессии: дата / сумма / услуга / инструктор. Минуты списаний здесь
+// не трогаем — для баланса абонемента есть корректировки с комментарием (4.3).
+export async function updateSessionAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const patch: Record<string, unknown> = {};
+  const date = String(formData.get("date") ?? "").trim();
+  if (DAY_RE.test(date)) patch.date = date;
+  const amount = parseVnd(formData.get("amount"));
+  if (amount !== null) patch.amount = amount;
+  const instructorId = String(formData.get("instructorId") ?? "");
+  if (instructorId) patch.instructor_id = instructorId;
+  const serviceId = String(formData.get("serviceId") ?? "");
+  if (serviceId) patch.service_id = serviceId;
+  if (Object.keys(patch).length === 0) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("sessions").update(patch).eq("id", id);
+  if (error) console.error("[admin] session update error:", error.message);
+  revalidatePath("/", "layout");
 }
 
 // «Перенести»: новая дата/время, статус живой — в ленте появится бейдж

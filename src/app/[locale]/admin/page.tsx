@@ -107,7 +107,10 @@ export default async function AdminHomePage() {
           <CountBubble count={freshCount} />
         </Link>
 
-        <SoonTile label="Сессии" />
+        <Link href="/admin/sessions" className={tileClass}>
+          Сессии
+          <span className="text-xs font-normal text-muted">занятия · задним числом</span>
+        </Link>
         <SoonTile label="Абонементы" />
 
         <SoonTile label="Клиенты" />
