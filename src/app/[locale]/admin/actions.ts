@@ -466,6 +466,59 @@ export async function toggleAgentActiveAction(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
+// ── Члены клуба (подэтап 4.6) ────────────────────────────────────────────────
+// Инвайт-ссылка: клиент купил абонемент офлайн → админ шлёт ему /invite/<token>
+// в мессенджер → клиент ставит пароль и получает кабинет. Токен живёт 7 дней
+// (default в БД), одноразовый (used_at). Повторное нажатие не плодит ссылки:
+// живой неиспользованный токен переиспользуем.
+export async function createInviteAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const clientId = String(formData.get("clientId") ?? "");
+  if (!clientId) return;
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("invite_tokens")
+    .select("id")
+    .eq("client_id", clientId)
+    .is("used_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (existing) return;
+
+  // randomUUID без дефисов = 32 hex-символа; подобрать нереально, а в
+  // мессенджере ссылка остаётся одной строкой.
+  const { error } = await supabase.from("invite_tokens").insert({
+    token: crypto.randomUUID().replace(/-/g, ""),
+    client_id: clientId,
+    created_by: admin.id,
+  });
+  if (error) console.error("[admin] invite create error:", error.message);
+  revalidatePath("/", "layout");
+}
+
+// Сделать клиента членом клуба вручную. Обычно членство создаёт продажа
+// абонемента; ручная кнопка — для случаев вроде «прошёл базовое обучение»
+// (условия членства ещё уточняются у руководителя).
+export async function addMemberAction(formData: FormData) {
+  await requireAdmin();
+  const clientId = String(formData.get("clientId") ?? "");
+  if (!clientId) return;
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("memberships")
+    .select("id")
+    .eq("client_id", clientId)
+    .maybeSingle();
+  if (existing) return;
+
+  const { error } = await supabase.from("memberships").insert({ client_id: clientId });
+  if (error) console.error("[admin] membership insert error:", error.message);
+  revalidatePath("/", "layout");
+}
+
 // «Перенести»: новая дата/время, статус живой — в ленте появится бейдж
 // «Перенесена» (по rescheduled_at), но запись продолжает свой цикл.
 export async function rescheduleAction(formData: FormData) {

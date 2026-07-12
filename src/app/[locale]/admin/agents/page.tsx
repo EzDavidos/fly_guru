@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { vnd } from "@/lib/stats";
 import { toggleAgentActiveAction } from "../actions";
 import { AgentCreateForm } from "./AgentCreateForm";
-import { CopyRefLink } from "./CopyRefLink";
+import { CopyLink } from "../CopyLink";
 
 export const metadata: Metadata = { title: "Админка · Агенты" };
 
@@ -63,7 +63,7 @@ function AgentCard({ a, stats }: { a: AgentRow; stats: AgentStats }) {
       </summary>
 
       <div className="space-y-3 border-t border-line/70 p-4 pt-3">
-        <CopyRefLink code={a.ref_code} />
+        <CopyLink path={`/r/${a.ref_code}`} />
 
         {/* Воронка: сколько людей открыли ссылку → сколько дошли до услуги. */}
         <div className="grid grid-cols-3 gap-2 text-center">

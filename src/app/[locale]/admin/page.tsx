@@ -125,7 +125,10 @@ export default async function AdminHomePage() {
           <span className="text-xs font-normal text-muted">реф-ссылки · награды</span>
         </Link>
 
-        <SoonTile label="Члены клуба" />
+        <Link href="/admin/members" className={tileClass}>
+          Члены клуба
+          <span className="text-xs font-normal text-muted">инвайты · кабинеты</span>
+        </Link>
         <SoonTile label="Материалы" />
 
         <SoonTile label="Дашборд" />
