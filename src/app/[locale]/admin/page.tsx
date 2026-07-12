@@ -134,7 +134,10 @@ export default async function AdminHomePage() {
           <span className="text-xs font-normal text-muted">ссылки для рекламы</span>
         </Link>
 
-        <SoonTile label="Дашборд" />
+        <Link href="/admin/dashboard" className={tileClass}>
+          Дашборд
+          <span className="text-xs font-normal text-muted">месяц цифрами</span>
+        </Link>
         <SoonTile label="Расчёт месяца" />
 
         <SoonTile label="Услуги" />

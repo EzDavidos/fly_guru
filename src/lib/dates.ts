@@ -40,6 +40,26 @@ export function vnCurrentMonth() {
   };
 }
 
+// Границы произвольного месяца 'YYYY-MM' (переключатель месяцев в дашборде).
+// Возвращает ту же форму, что vnCurrentMonth.
+export function vnMonth(ym: string) {
+  const [y, m1] = ym.split("-").map(Number); // m1 — 1-based из URL
+  const fromDate = new Date(Date.UTC(y, m1 - 1, 1));
+  const toDate = new Date(Date.UTC(y, m1, 1));
+
+  return {
+    fromDay: fromDate.toISOString().slice(0, 10),
+    toDay: toDate.toISOString().slice(0, 10),
+    fromIso: new Date(fromDate.getTime() - VN_OFFSET_MS).toISOString(),
+    toIso: new Date(toDate.getTime() - VN_OFFSET_MS).toISOString(),
+    label: new Intl.DateTimeFormat("ru-RU", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC", // дата уже «местная» — форматируем как есть
+    }).format(fromDate),
+  };
+}
+
 // Произвольный период для статистики: обе даты включительно ('YYYY-MM-DD').
 // Возвращает те же границы, что и vnCurrentMonth: правая — эксклюзивная
 // (date >= fromDay AND date < toDay), ISO — местная полночь в UTC.
