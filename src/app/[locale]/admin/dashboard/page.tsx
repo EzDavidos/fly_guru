@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { vnCurrentMonth, vnMonth } from "@/lib/dates";
+import { vnMonth } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
+import { MonthSwitcher, resolveYm } from "../MonthSwitcher";
 
 export const metadata: Metadata = { title: "Админка · Дашборд" };
 
@@ -27,13 +27,6 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Отменены",
   archived: "В архиве",
 };
-
-// 'YYYY-MM' соседнего месяца для стрелок переключателя.
-function shiftYm(ym: string, n: number): string {
-  const [y, m] = ym.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + n, 1));
-  return d.toISOString().slice(0, 7);
-}
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -71,9 +64,7 @@ export default async function AdminDashboardPage({
   searchParams: Promise<{ m?: string }>;
 }) {
   const { m } = await searchParams;
-  const current = vnCurrentMonth();
-  const currentYm = current.fromDay.slice(0, 7);
-  const ym = /^\d{4}-\d{2}$/.test(m ?? "") ? m! : currentYm;
+  const ym = resolveYm(m);
   const month = vnMonth(ym);
 
   const supabase = await createClient();
@@ -189,28 +180,7 @@ export default async function AdminDashboardPage({
     <div>
       <h1 className="text-2xl font-bold">Дашборд</h1>
 
-      {/* Переключатель месяцев: ‹ июль 2026 › (вперёд — не дальше текущего). */}
-      <div className="mt-3 flex items-center justify-between rounded-2xl border border-line bg-surface px-2 py-1.5">
-        <Link
-          href={`/admin/dashboard?m=${shiftYm(ym, -1)}`}
-          className="rounded-full px-3 py-1.5 text-lg text-muted transition-colors hover:text-primary"
-          aria-label="Предыдущий месяц"
-        >
-          ‹
-        </Link>
-        <span className="font-semibold capitalize">{month.label}</span>
-        {ym < currentYm ? (
-          <Link
-            href={`/admin/dashboard?m=${shiftYm(ym, 1)}`}
-            className="rounded-full px-3 py-1.5 text-lg text-muted transition-colors hover:text-primary"
-            aria-label="Следующий месяц"
-          >
-            ›
-          </Link>
-        ) : (
-          <span className="px-3 py-1.5 text-lg text-line">›</span>
-        )}
-      </div>
+      <MonthSwitcher ym={ym} basePath="/admin/dashboard" />
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div className="col-span-2 rounded-2xl border border-line bg-surface p-4">

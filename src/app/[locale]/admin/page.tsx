@@ -138,7 +138,10 @@ export default async function AdminHomePage() {
           Дашборд
           <span className="text-xs font-normal text-muted">месяц цифрами</span>
         </Link>
-        <SoonTile label="Расчёт месяца" />
+        <Link href="/admin/payroll" className={tileClass}>
+          Расчёт месяца
+          <span className="text-xs font-normal text-muted">ЗП · агенты · CSV</span>
+        </Link>
 
         <SoonTile label="Услуги" />
         <Link href="/instructor/settings" className={tileClass}>
