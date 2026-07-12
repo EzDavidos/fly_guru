@@ -386,6 +386,86 @@ export async function updateClientAction(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
+// ── Агенты (подэтап 4.5) ─────────────────────────────────────────────────────
+// Реф-код: 6 строчных символов без похожих знаков (0/O, 1/l/I) — код диктуют
+// вслух и набирают с телефона, путаница недопустима.
+const REF_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+
+function randomRefCode(): string {
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)];
+  }
+  return code;
+}
+
+// Новый агент: users (role=agent, БЕЗ auth_id — вход в систему ему не нужен,
+// запись существует ради комиссии и статистики) + agents с уникальным реф-кодом.
+// Комиссию не спрашиваем: default 300 000 ₫ задан в БД.
+export async function createAgentAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  const name = String(formData.get("name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  if (!name) return { error: "Укажите имя агента." };
+
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .insert({
+      role: "agent",
+      name,
+      phone: phone ? phoneDigits(phone) || phone : null,
+    })
+    .select("id")
+    .single();
+  if (userError || !user) {
+    return { error: `Не удалось создать агента: ${userError?.message ?? "?"}` };
+  }
+
+  // Коллизия кода маловероятна (31^6 вариантов), но unique-индекс может её
+  // поймать — тогда пробуем другой код, а не показываем ошибку человеку.
+  let agentError: string | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { error } = await supabase
+      .from("agents")
+      .insert({ user_id: user.id, ref_code: randomRefCode() });
+    if (!error) {
+      agentError = null;
+      break;
+    }
+    agentError = error.message;
+    if (error.code !== "23505") break; // не unique-конфликт — повтор не поможет
+  }
+  if (agentError) {
+    // users-запись без agents бесполезна и замусорит базу — подчищаем.
+    await supabase.from("users").delete().eq("id", user.id);
+    return { error: `Не удалось создать агента: ${agentError}` };
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/admin/agents");
+}
+
+// Выключить/включить агента. Выключенный: лендинг /r/<код> перестаёт принимать
+// гостей (мягкий редирект на /training), но история и награды остаются.
+export async function toggleAgentActiveAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("agents")
+    .update({ active: formData.get("active") !== "1" })
+    .eq("id", id);
+  if (error) console.error("[admin] agent toggle error:", error.message);
+  revalidatePath("/", "layout");
+}
+
 // «Перенести»: новая дата/время, статус живой — в ленте появится бейдж
 // «Перенесена» (по rescheduled_at), но запись продолжает свой цикл.
 export async function rescheduleAction(formData: FormData) {
