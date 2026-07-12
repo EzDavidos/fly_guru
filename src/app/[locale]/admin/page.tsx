@@ -116,7 +116,10 @@ export default async function AdminHomePage() {
           <span className="text-xs font-normal text-muted">оплаты · минуты</span>
         </Link>
 
-        <SoonTile label="Клиенты" />
+        <Link href="/admin/clients" className={tileClass}>
+          Клиенты
+          <span className="text-xs font-normal text-muted">поиск · карточки</span>
+        </Link>
         <SoonTile label="Агенты" />
 
         <SoonTile label="Члены клуба" />

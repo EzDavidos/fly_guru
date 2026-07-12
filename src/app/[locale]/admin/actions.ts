@@ -363,6 +363,29 @@ export async function adjustMinutesAction(
   redirect("/admin/subscriptions");
 }
 
+// ── Клиенты (подэтап 4.4) ────────────────────────────────────────────────────
+// Правка карточки клиента: имя, телефон, внутренняя заметка. Телефон храним
+// цифрами (как resolveClient) — так работает дедуп при следующих оформлениях.
+export async function updateClientAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id || !name) return;
+
+  const phoneRaw = String(formData.get("phone") ?? "").trim();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      name,
+      phone: phoneRaw ? phoneDigits(phoneRaw) || phoneRaw : null,
+      internal_note: String(formData.get("note") ?? "").trim() || null,
+    })
+    .eq("id", id);
+  if (error) console.error("[admin] client update error:", error.message);
+  revalidatePath("/", "layout");
+}
+
 // «Перенести»: новая дата/время, статус живой — в ленте появится бейдж
 // «Перенесена» (по rescheduled_at), но запись продолжает свой цикл.
 export async function rescheduleAction(formData: FormData) {
