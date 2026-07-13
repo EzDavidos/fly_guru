@@ -42,16 +42,19 @@ async function findOrCreateClient(
     source: "site" | "offline";
     referrer?: { type: "agent"; id: string } | null;
   },
-): Promise<{ id: string } | { error: string }> {
+): Promise<{ id: string; existingName?: string } | { error: string }> {
   const { data: existing, error: selError } = await supabase
     .from("clients")
-    .select("id, phone")
+    .select("id, name, phone")
     .not("phone", "is", null)
     .limit(1000);
   if (selError) return { error: `Не удалось найти клиента: ${selError.message}` };
 
+  // Телефон уже есть в базе → это тот же человек, вторую карточку не заводим.
+  // Введённое имя при этом НЕ перезаписывает старое — сообщаем вызвавшему,
+  // на кого реально легла запись (иначе кажется, что клиент «потерялся»).
   const match = (existing ?? []).find((c) => phonesMatch(c.phone, input.phone));
-  if (match) return { id: match.id };
+  if (match) return { id: match.id, existingName: match.name ?? undefined };
 
   const { data: created, error: insError } = await supabase
     .from("clients")
@@ -217,6 +220,7 @@ export async function recordClientAction(
     service: service.name,
   });
   if (discounted) params.set("discount", "1");
+  if (clientResult.existingName) params.set("existing", clientResult.existingName);
   redirect(`/instructor/done?${params.toString()}`);
 }
 
@@ -268,6 +272,7 @@ export async function sellSubscriptionAction(
 
   const params = new URLSearchParams({ type: "subscription", name });
   if (paid) params.set("paid", "1");
+  if (clientResult.existingName) params.set("existing", clientResult.existingName);
   redirect(`/instructor/done?${params.toString()}`);
 }
 

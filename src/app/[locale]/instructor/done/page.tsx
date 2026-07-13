@@ -19,6 +19,7 @@ export default async function DonePage({
     paid?: string;
     minutes?: string;
     left?: string;
+    existing?: string;
   }>;
 }) {
   const p = await searchParams;
@@ -68,6 +69,13 @@ export default async function DonePage({
           <p key={d}>{d}</p>
         ))}
       </div>
+      {p.existing ? (
+        <p className="mx-auto mt-4 max-w-sm rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-ink">
+          Этот телефон уже есть в базе — записано на существующего клиента{" "}
+          <b>«{p.existing}»</b>, новая карточка не создавалась. Если это другой
+          человек, укажите его настоящий номер.
+        </p>
+      ) : null}
       <div className="mt-8 flex flex-col gap-3">
         <Link
           href={nextHref}
