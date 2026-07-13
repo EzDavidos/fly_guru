@@ -1,36 +1,24 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { CopyLink } from "../CopyLink";
+import { ConfirmSubmit } from "../subscriptions/SubscriptionForms";
+import { deleteMaterialAction } from "../actions";
+import { MaterialCreateForm, MaterialEditForm } from "./MaterialForms";
 
 export const metadata: Metadata = { title: "Админка · Материалы" };
 
 // Шпаргалка владельца: готовые меченые ссылки для рекламы. Метка ?src=
 // приклеивается к гостю на 30 дней (lib/attribution.ts) и приходит вместе
 // с его заявкой — так видно, какой канал реально приводит людей.
+// Каналы живут в таблице materials (0009) — админ добавляет и правит их сам.
 // Плюс реф-ссылки активных агентов — раздать не заходя в «Агентов».
 
-const CHANNELS: { label: string; hint: string; path: string }[] = [
-  {
-    label: "Instagram",
-    hint: "в шапку профиля и в сторис",
-    path: "/?src=instagram",
-  },
-  {
-    label: "QR-код",
-    hint: "зашить в QR на стойке или баннере",
-    path: "/?src=qr",
-  },
-  {
-    label: "Флаер",
-    hint: "печатные листовки и визитки",
-    path: "/?src=flyer",
-  },
-  {
-    label: "Партнёр",
-    hint: "отели, кафе, прокаты без личного реф-кода",
-    path: "/?src=partner",
-  },
-];
+interface MaterialRow {
+  id: string;
+  label: string;
+  hint: string | null;
+  src: string;
+}
 
 interface AgentLinkRow {
   id: string;
@@ -40,12 +28,20 @@ interface AgentLinkRow {
 
 export default async function AdminMaterialsPage() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("agents")
-    .select("id, ref_code, user:users!user_id(name)")
-    .eq("active", true);
-  const agents = ((data ?? []) as unknown as AgentLinkRow[]).sort((a, b) =>
-    (a.user?.name ?? "").localeCompare(b.user?.name ?? "", "ru"),
+  const [materialsRes, agentsRes] = await Promise.all([
+    supabase
+      .from("materials")
+      .select("id, label, hint, src")
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("agents")
+      .select("id, ref_code, user:users!user_id(name)")
+      .eq("active", true),
+  ]);
+
+  const materials = (materialsRes.data ?? []) as MaterialRow[];
+  const agents = ((agentsRes.data ?? []) as unknown as AgentLinkRow[]).sort(
+    (a, b) => (a.user?.name ?? "").localeCompare(b.user?.name ?? "", "ru"),
   );
 
   return (
@@ -58,17 +54,51 @@ export default async function AdminMaterialsPage() {
 
       <section className="mt-4 rounded-2xl border border-line bg-surface p-4">
         <h2 className="font-bold">Каналы</h2>
-        <div className="mt-3 space-y-3">
-          {CHANNELS.map((ch) => (
-            <div key={ch.path}>
+        {materials.length === 0 && (
+          <p className="mt-3 text-sm text-muted">
+            Каналов пока нет — добавьте первый ниже.
+          </p>
+        )}
+        <div className="mt-3 space-y-4">
+          {materials.map((m) => (
+            <div key={m.id}>
               <p className="text-sm font-semibold">
-                {ch.label} <span className="font-normal text-muted">· {ch.hint}</span>
+                {m.label}
+                {m.hint && <span className="font-normal text-muted"> · {m.hint}</span>}
               </p>
               <div className="mt-1">
-                <CopyLink path={ch.path} />
+                <CopyLink path={`/?src=${m.src}`} />
               </div>
+              <details className="mt-1">
+                <summary className="cursor-pointer list-none text-xs font-semibold text-muted hover:text-primary [&::-webkit-details-marker]:hidden">
+                  Править ▾
+                </summary>
+                <div className="mt-2 rounded-xl border border-line/70 p-3">
+                  <MaterialEditForm material={m} />
+                  <form action={deleteMaterialAction} className="mt-2">
+                    <input type="hidden" name="id" value={m.id} />
+                    <ConfirmSubmit
+                      message={`Удалить канал «${m.label}»? Ссылка перестанет раздаваться отсюда; уже пришедшие заявки метку сохранят.`}
+                      className="text-xs font-semibold text-muted transition-colors hover:text-red-500"
+                    >
+                      Удалить канал
+                    </ConfirmSubmit>
+                  </form>
+                </div>
+              </details>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="mt-4 rounded-2xl border border-line bg-surface p-4">
+        <h2 className="font-bold">Новый канал</h2>
+        <p className="mt-1 text-xs text-muted">
+          Придумайте метку — и раздавайте ссылку в новом месте: баннер, чат,
+          обзорщик. Заявки с неё будут подписаны этой меткой.
+        </p>
+        <div className="mt-3">
+          <MaterialCreateForm />
         </div>
       </section>
 

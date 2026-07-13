@@ -388,12 +388,15 @@ export async function updateClientAction(formData: FormData) {
   if (!id || !name) return;
 
   const phoneRaw = String(formData.get("phone") ?? "").trim();
+  // Возраст: пусто или мусор → null («не указан»).
+  const ageNum = Math.floor(Number(formData.get("age")));
   const supabase = await createClient();
   const { error } = await supabase
     .from("clients")
     .update({
       name,
       phone: phoneRaw ? phoneDigits(phoneRaw) || phoneRaw : null,
+      age: Number.isFinite(ageNum) && ageNum > 0 ? ageNum : null,
       internal_note: String(formData.get("note") ?? "").trim() || null,
     })
     .eq("id", id);
@@ -648,4 +651,83 @@ export async function createServiceAction(
   }
   revalidatePath("/", "layout");
   redirect("/admin/services"); // redirect = чистая форма после успеха
+}
+
+// ── Материалы (фиксы после этапа 4) ──────────────────────────────────────────
+// Каналы-метки из таблицы materials: ссылка /?src=<код> в рекламе → метка
+// приходит с заявкой. Код метки: латиница/цифры/дефис, чтобы ссылка не ломалась.
+const SRC_RE = /^[a-z0-9_-]{2,30}$/;
+
+function materialFields(formData: FormData) {
+  return {
+    label: String(formData.get("label") ?? "").trim(),
+    hint: String(formData.get("hint") ?? "").trim() || null,
+    src: String(formData.get("src") ?? "").trim().toLowerCase(),
+  };
+}
+
+export async function createMaterialAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const fields = materialFields(formData);
+  if (!fields.label) return { error: "Укажите название канала." };
+  if (!SRC_RE.test(fields.src)) {
+    return { error: "Метка: 2–30 символов, латиница, цифры, дефис." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("materials").insert(fields);
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? `Метка «${fields.src}» уже занята.`
+          : `Не удалось создать канал: ${error.message}`,
+    };
+  }
+  revalidatePath("/", "layout");
+  redirect("/admin/materials"); // redirect = чистая форма после успеха
+}
+
+export async function updateMaterialAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const id = String(formData.get("id") ?? "");
+  const fields = materialFields(formData);
+  if (!id || !fields.label) return { error: "Укажите название канала." };
+  if (!SRC_RE.test(fields.src)) {
+    return { error: "Метка: 2–30 символов, латиница, цифры, дефис." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("materials").update(fields).eq("id", id);
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? `Метка «${fields.src}» уже занята.`
+          : `Не удалось сохранить: ${error.message}`,
+    };
+  }
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+// Удаление безопасно: bookings.src хранит метку текстом, FK нет — история
+// заявок и статистика источников не трогаются.
+export async function deleteMaterialAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("materials").delete().eq("id", id);
+  if (error) console.error("[admin] material delete error:", error.message);
+  revalidatePath("/", "layout");
 }
