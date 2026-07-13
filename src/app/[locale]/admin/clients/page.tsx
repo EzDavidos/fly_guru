@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { phoneDigits } from "@/lib/phone";
 import { vnd } from "@/lib/stats";
@@ -18,8 +19,18 @@ interface ClientRow {
   referrer_type: string | null;
   referrer_id: string | null;
   internal_note: string | null;
+  age: number | null;
   created_at: string;
 }
+
+// Сортировки списка. Ключ — значение ?sort=, подпись — текст чипса.
+const SORTS = [
+  { key: "", label: "Новые" },
+  { key: "sessions", label: "По занятиям" },
+  { key: "spent", label: "По тратам" },
+  { key: "visit", label: "По визиту" },
+  { key: "age", label: "По возрасту" },
+] as const;
 
 const SOURCE_LABEL: Record<string, string> = {
   site: "с сайта",
@@ -87,7 +98,10 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
             Источник: {SOURCE_LABEL[c.source] ?? c.source}
             {stats.agentName && ` — ${stats.agentName}`}
           </p>
-          <p>В базе с {fmtDay(c.created_at)}</p>
+          <p>
+            В базе с {fmtDay(c.created_at)}
+            {c.age !== null && ` · ${c.age} лет`}
+          </p>
           <p>
             Занятий: {stats.sessions} · потратил{" "}
             <span className="font-bold text-ink">{vnd(stats.spent)}</span>
@@ -117,6 +131,17 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
                 className={`mt-1 ${inputClass}`}
               />
             </label>
+            <label className="text-xs text-muted">
+              Возраст
+              <input
+                type="number"
+                name="age"
+                min={1}
+                max={120}
+                defaultValue={c.age ?? ""}
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
           </div>
           <label className="mt-2 block text-xs text-muted">
             Внутренняя заметка (клиент не видит)
@@ -142,18 +167,23 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
 export default async function AdminClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string }>;
 }) {
-  const { q = "" } = await searchParams;
+  const { q = "", sort = "" } = await searchParams;
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("clients")
-    .select(
-      "id, name, phone, source, referrer_type, referrer_id, internal_note, created_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(1000);
+  // Сессии тянем по ВСЕМ клиентам сразу (не по показанным): сортировка по
+  // занятиям/тратам/визиту должна ранжировать весь список, а не первые 50.
+  const [{ data }, allSessionsRes] = await Promise.all([
+    supabase
+      .from("clients")
+      .select(
+        "id, name, phone, source, referrer_type, referrer_id, internal_note, age, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(1000),
+    supabase.from("sessions").select("client_id, amount, date").limit(10000),
+  ]);
   const all = (data ?? []) as ClientRow[];
 
   // Поиск в JS: телефоны в базе разноформатные, сравниваем цифры с цифрами,
@@ -168,21 +198,47 @@ export default async function AdminClientsPage({
             phoneDigits(c.phone ?? "").includes(needleDigits)),
       )
     : all;
-  const shown = found.slice(0, PAGE_SIZE);
+
+  const statsById = new Map<string, ClientStats>();
+  const stat = (id: string): ClientStats => {
+    let s = statsById.get(id);
+    if (!s) {
+      s = { sessions: 0, spent: 0, lastVisit: null, activeSubs: 0, member: false, agentName: null };
+      statsById.set(id, s);
+    }
+    return s;
+  };
+  for (const r of allSessionsRes.data ?? []) {
+    const s = stat(r.client_id as string);
+    s.sessions += 1;
+    s.spent += (r.amount as number) ?? 0;
+    const d = r.date as string;
+    if (!s.lastVisit || d > s.lastVisit) s.lastVisit = d;
+  }
+
+  // Сортировка. «Новые» — как пришло из базы (created_at desc). Метрики — по
+  // убыванию; клиенты без значения (нет визитов / возраст не указан) — в конце.
+  const sorted = [...found];
+  if (sort === "sessions") {
+    sorted.sort((a, b) => stat(b.id).sessions - stat(a.id).sessions);
+  } else if (sort === "spent") {
+    sorted.sort((a, b) => stat(b.id).spent - stat(a.id).spent);
+  } else if (sort === "visit") {
+    sorted.sort((a, b) =>
+      (stat(b.id).lastVisit ?? "").localeCompare(stat(a.id).lastVisit ?? ""),
+    );
+  } else if (sort === "age") {
+    sorted.sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
+  }
+  const shown = sorted.slice(0, PAGE_SIZE);
   const ids = shown.map((c) => c.id);
 
-  // Агрегаты — батчами только по показанным клиентам.
+  // Остальные агрегаты (бейджи) — батчами только по показанным клиентам.
   const agentIds = shown
     .filter((c) => c.referrer_type === "agent" && c.referrer_id)
     .map((c) => c.referrer_id as string);
 
-  const [sessionsRes, subsRes, membersRes, agentsRes] = await Promise.all([
-    ids.length
-      ? supabase
-          .from("sessions")
-          .select("client_id, amount, date")
-          .in("client_id", ids)
-      : Promise.resolve({ data: [] }),
+  const [subsRes, membersRes, agentsRes] = await Promise.all([
     ids.length
       ? supabase
           .from("subscriptions")
@@ -199,23 +255,6 @@ export default async function AdminClientsPage({
           .in("id", agentIds)
       : Promise.resolve({ data: [] }),
   ]);
-
-  const statsById = new Map<string, ClientStats>();
-  const stat = (id: string): ClientStats => {
-    let s = statsById.get(id);
-    if (!s) {
-      s = { sessions: 0, spent: 0, lastVisit: null, activeSubs: 0, member: false, agentName: null };
-      statsById.set(id, s);
-    }
-    return s;
-  };
-  for (const r of sessionsRes.data ?? []) {
-    const s = stat(r.client_id as string);
-    s.sessions += 1;
-    s.spent += (r.amount as number) ?? 0;
-    const d = r.date as string;
-    if (!s.lastVisit || d > s.lastVisit) s.lastVisit = d;
-  }
   for (const r of subsRes.data ?? []) {
     if (r.status === "active") stat(r.client_id as string).activeSubs += 1;
   }
@@ -249,6 +288,7 @@ export default async function AdminClientsPage({
           placeholder="Имя или телефон…"
           className={inputClass}
         />
+        {sort && <input type="hidden" name="sort" value={sort} />}
         <button
           type="submit"
           className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
@@ -256,6 +296,28 @@ export default async function AdminClientsPage({
           Найти
         </button>
       </form>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {SORTS.map((s) => {
+          const params = new URLSearchParams();
+          if (q) params.set("q", q);
+          if (s.key) params.set("sort", s.key);
+          const qs = params.toString();
+          return (
+            <Link
+              key={s.key}
+              href={qs ? `/admin/clients?${qs}` : "/admin/clients"}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                sort === s.key
+                  ? "bg-primary text-white"
+                  : "border border-line text-muted hover:border-primary hover:text-primary"
+              }`}
+            >
+              {s.label}
+            </Link>
+          );
+        })}
+      </div>
 
       <p className="mt-4 text-sm text-muted">
         {found.length === all.length
