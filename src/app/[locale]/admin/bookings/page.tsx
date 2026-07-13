@@ -208,9 +208,7 @@ function BookingCard({
             )}
             {b.status === "new" && (
               <button
-                formAction={setStatusAction}
-                name="status"
-                value="contacted"
+                formAction={setStatusAction.bind(null, "contacted")}
                 className={btnGhost}
               >
                 В обработку
@@ -224,9 +222,7 @@ function BookingCard({
             {b.status === "confirmed" && (
               <>
                 <button
-                  formAction={setStatusAction}
-                  name="status"
-                  value="done"
+                  formAction={setStatusAction.bind(null, "done")}
                   className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
                 >
                   Выполнена
@@ -238,9 +234,7 @@ function BookingCard({
             )}
             {!terminal && (
               <button
-                formAction={setStatusAction}
-                name="status"
-                value="cancelled"
+                formAction={setStatusAction.bind(null, "cancelled")}
                 className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-red-500 hover:text-red-500"
               >
                 Отменить
@@ -248,9 +242,7 @@ function BookingCard({
             )}
             {b.status === "done" && hasPendingReward && (
               <button
-                formAction={setStatusAction}
-                name="status"
-                value="done"
+                formAction={setStatusAction.bind(null, "done")}
                 className={btnAccent}
               >
                 Подтвердить реф-награду
@@ -258,9 +250,7 @@ function BookingCard({
             )}
             {(b.status === "done" || b.status === "cancelled") && (
               <button
-                formAction={setStatusAction}
-                name="status"
-                value="archived"
+                formAction={setStatusAction.bind(null, "archived")}
                 className={btnGhost}
               >
                 В архив

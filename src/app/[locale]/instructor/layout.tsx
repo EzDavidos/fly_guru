@@ -13,11 +13,15 @@ export default async function InstructorLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("instructor", "/instructor");
+  const user = await requireRole("instructor", "/instructor");
+
+  // Админ попадает сюда на общие страницы (например, настройки) — стрелка
+  // «назад» должна вести его в админку, а не в инструкторский кабинет.
+  const home = user.role === "admin" ? "/admin" : "/instructor";
 
   return (
     <div className="mx-auto w-full max-w-md px-4 pb-16 pt-6">
-      <CabinetHeader />
+      <CabinetHeader home={home} label={user.role === "admin" ? "Админка" : "Кабинет"} />
       {children}
     </div>
   );

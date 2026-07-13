@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { NAV_LINKS } from "./nav";
@@ -19,28 +20,48 @@ export function SiteHeader() {
   // Активные записи (подтверждены админом, никем не приняты) — красный
   // кружочек на кнопке «Кабинет» у инструктора и админа.
   const [activeCount, setActiveCount] = useState(0);
+  const pathname = usePathname();
 
+  // Пересчёт при каждой смене страницы и при возврате во вкладку — раньше
+  // цифра считалась один раз при загрузке и «застревала».
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const role = session?.user.app_metadata?.role as string | undefined;
-      if (!role) return;
-      setCabinetHref(`/${role}`); // /admin, /instructor, /member, /agent
+    let cancelled = false;
 
-      if (role === "instructor" || role === "admin") {
-        // RLS (bookings_select_staff) пропустит только персонал.
-        // Инструктору важны непринятые записи, админу — свежие заявки с сайта.
-        let q = supabase
-          .from("bookings")
-          .select("id", { count: "exact", head: true });
-        q =
-          role === "admin"
-            ? q.eq("status", "new")
-            : q.eq("status", "confirmed").is("accepted_by", null);
-        q.then(({ count }) => setActiveCount(count ?? 0));
-      }
-    });
-  }, []);
+    const refresh = () => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (cancelled) return;
+        const role = session?.user.app_metadata?.role as string | undefined;
+        if (!role) return;
+        setCabinetHref(`/${role}`); // /admin, /instructor, /member, /agent
+
+        if (role === "instructor" || role === "admin") {
+          // RLS (bookings_select_staff) пропустит только персонал.
+          // Инструктору важны непринятые записи, админу — свежие заявки с сайта.
+          let q = supabase
+            .from("bookings")
+            .select("id", { count: "exact", head: true });
+          q =
+            role === "admin"
+              ? q.eq("status", "new")
+              : q.eq("status", "confirmed").is("accepted_by", null);
+          q.then(({ count }) => {
+            if (!cancelled) setActiveCount(count ?? 0);
+          });
+        }
+      });
+    };
+
+    refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [pathname]);
 
   const authHref = cabinetHref ?? "/login";
   const authLabel = cabinetHref ? "Кабинет" : "Вход";

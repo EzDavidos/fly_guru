@@ -94,10 +94,12 @@ export async function confirmBookingAction(formData: FormData) {
 // Смена статуса из карточки: в обработке / подтверждена / выполнена / отменена /
 // в архив. Побочные эффекты завязаны на статус, а не на кнопку, чтобы работать
 // одинаково из любого места ленты.
-export async function setStatusAction(formData: FormData) {
+// Статус приходит первым аргументом через .bind() на кнопке: React НЕ кладёт
+// name/value кнопки в FormData при formAction-функции — через name="status"
+// сюда приходила пустота, и все кнопки статусов молча не работали.
+export async function setStatusAction(status: string, formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
-  const status = String(formData.get("status") ?? "");
   const allowed = ["contacted", "confirmed", "done", "cancelled", "archived"];
   if (!id || !allowed.includes(status)) return;
 
