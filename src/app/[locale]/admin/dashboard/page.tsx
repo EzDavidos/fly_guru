@@ -10,9 +10,9 @@ import {
 } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
 
-export const metadata: Metadata = { title: "Админка · Дашборд" };
+export const metadata: Metadata = { title: "Админка · Статистика" };
 
-// Дашборд v2: «как дела у школы» за любой период. Всё read-only.
+// Статистика (бывший дашборд): «как дела у школы» за любой период. Read-only.
 // Сверху таблица визитов (строка = одно занятие) с сортировкой по колонкам
 // и фильтрами по услуге/инструктору; фильтры действуют и на графики ниже.
 // Правило денег: доход существует только после факта оплаты — неоплаченные
@@ -359,8 +359,11 @@ export default async function AdminDashboardPage({
   const catBase = { sort, dir }; // фильтры сбрасывать сортировку не должны
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Дашборд</h1>
+    // Кабинет зажат в узкую колонку (max-w-md в layout) — для телефона это
+    // правильно, но статистике на ПК нужна ширина. Вырываемся из колонки:
+    // блок центрируется по вьюпорту и растёт до 72rem, не вызывая скролла.
+    <div className="lg:relative lg:left-1/2 lg:w-[min(72rem,calc(100vw-3rem))] lg:-translate-x-1/2">
+      <h1 className="text-2xl font-bold">Статистика</h1>
       <p className="mt-1 text-sm capitalize text-muted">{label}</p>
 
       {/* Пресеты периода + свой период */}
@@ -394,7 +397,7 @@ export default async function AdminDashboardPage({
         </Link>
       </div>
 
-      <form className="mt-3 flex items-end gap-2" action="">
+      <form className="mt-3 flex items-end gap-2 lg:max-w-md" action="">
         {cat && <input type="hidden" name="cat" value={cat} />}
         {inst && <input type="hidden" name="inst" value={inst} />}
         <label className="flex-1 text-xs text-muted">
@@ -493,10 +496,10 @@ export default async function AdminDashboardPage({
                 {shown.map((r) => (
                   <tr key={r.id} className="border-b border-line/40 last:border-0">
                     <td className="px-3 py-2 text-muted">{fmtDay(r.date)}</td>
-                    <td className="max-w-40 truncate px-3 py-2 font-semibold">
+                    <td className="max-w-40 truncate px-3 py-2 font-semibold lg:max-w-none">
                       {r.client?.name ?? "—"}
                     </td>
-                    <td className="max-w-44 truncate px-3 py-2">
+                    <td className="max-w-44 truncate px-3 py-2 lg:max-w-none">
                       {r.subscription_id
                         ? `Абонемент · ${r.minutes_used ?? 0} мин`
                         : (r.service?.name ?? "—")}
@@ -504,8 +507,8 @@ export default async function AdminDashboardPage({
                     <td className="px-3 py-2">
                       {r.amount > 0 ? vnd(r.amount) : <span className="text-muted">—</span>}
                     </td>
-                    <td className="max-w-32 truncate px-3 py-2">{r.instructor?.name ?? "—"}</td>
-                    <td className="max-w-32 truncate px-3 py-2 text-muted">
+                    <td className="max-w-32 truncate px-3 py-2 lg:max-w-none">{r.instructor?.name ?? "—"}</td>
+                    <td className="max-w-32 truncate px-3 py-2 text-muted lg:max-w-none">
                       {r.creator?.name ?? "—"}
                     </td>
                     <td className="px-3 py-2">{visitsOf(r) || "—"}</td>
@@ -527,49 +530,50 @@ export default async function AdminDashboardPage({
         )}
       </section>
 
-      {/* Итоги периода — без фильтров, деньги только по факту оплаты */}
-      <div className="mt-3 rounded-2xl border border-line bg-surface p-4">
-        <p className="text-xs text-muted">Выручка за период · только оплаченное</p>
-        <p className="mt-1 text-3xl font-bold text-primary">
-          {vnd(sessions.reduce((s, r) => s + r.amount, 0) + paidSubsSum)}
-        </p>
-        <div className="mt-3 space-y-1 text-sm text-muted">
-          <p>
-            Сессии ({sessions.length}):{" "}
-            <span className="font-semibold text-ink">
-              {vnd(sessions.reduce((s, r) => s + r.amount, 0))}
-            </span>
+      {/* Итоги и графики: на телефоне — колонкой, на ПК — сеткой в 2–3 ряда
+          с увеличенными отступами, чтобы блоки читались раздельно. */}
+      <div className="mt-3 grid gap-3 lg:mt-6 lg:grid-cols-2 lg:gap-6 xl:grid-cols-3">
+        {/* Итоги периода — без фильтров, деньги только по факту оплаты */}
+        <div className="rounded-2xl border border-line bg-surface p-4">
+          <p className="text-xs text-muted">Выручка за период · только оплаченное</p>
+          <p className="mt-1 text-3xl font-bold text-primary">
+            {vnd(sessions.reduce((s, r) => s + r.amount, 0) + paidSubsSum)}
           </p>
-          <p>
-            Оплачено абонементов ({paidSubs.length}):{" "}
-            <span className="font-semibold text-ink">{vnd(paidSubsSum)}</span>
-          </p>
-          <p>
-            Новых клиентов: {(clientsRes.data ?? []).length} · заявок: {bookings.length}{" "}
-            (выполнено {doneCount}, отменено {cancelledCount})
-          </p>
-          {lostSum > 0 && (
+          <div className="mt-3 space-y-1 text-sm text-muted">
             <p>
-              Потенциально потеряно на отменённых заявках:{" "}
-              <span className="font-semibold text-ink">{vnd(lostSum)}</span>
+              Сессии ({sessions.length}):{" "}
+              <span className="font-semibold text-ink">
+                {vnd(sessions.reduce((s, r) => s + r.amount, 0))}
+              </span>
+            </p>
+            <p>
+              Оплачено абонементов ({paidSubs.length}):{" "}
+              <span className="font-semibold text-ink">{vnd(paidSubsSum)}</span>
+            </p>
+            <p>
+              Новых клиентов: {(clientsRes.data ?? []).length} · заявок: {bookings.length}{" "}
+              (выполнено {doneCount}, отменено {cancelledCount})
+            </p>
+            {lostSum > 0 && (
+              <p>
+                Потенциально потеряно на отменённых заявках:{" "}
+                <span className="font-semibold text-ink">{vnd(lostSum)}</span>
+              </p>
+            )}
+          </div>
+          {unpaid.length > 0 && (
+            <p className="mt-3 border-t border-line/70 pt-2 text-xs text-muted">
+              Ожидают оплату: {unpaid.length} абонемент(а) на {vnd(unpaidSum)} — в итоги
+              не входят (всего по школе).
             </p>
           )}
         </div>
-        {unpaid.length > 0 && (
-          <p className="mt-3 border-t border-line/70 pt-2 text-xs text-muted">
-            Ожидают оплату: {unpaid.length} абонемент(а) на {vnd(unpaidSum)} — в итоги
-            не входят (всего по школе).
-          </p>
-        )}
-      </div>
 
-      {/* Графики: длина полосы — сравнение, точные цифры — справа */}
-      <div className="mt-3 space-y-3">
-        {/* Динамика по дням/месяцам */}
+        {/* Динамика по дням/месяцам — на широком экране занимает два столбца */}
         {days.length > 1 && (
-          <section className="rounded-2xl border border-line bg-surface p-4">
+          <section className="rounded-2xl border border-line bg-surface p-4 xl:col-span-2">
             <h2 className="font-bold">{monthly ? "Выручка по месяцам" : "Выручка по дням"}</h2>
-            <div className="mt-3 flex h-28 items-end gap-0.5 overflow-x-auto">
+            <div className="mt-3 flex h-28 items-end gap-0.5 overflow-x-auto lg:h-40">
               {days.map(([key, d]) => (
                 <div
                   key={key}

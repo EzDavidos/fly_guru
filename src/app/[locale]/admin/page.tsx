@@ -124,7 +124,7 @@ export default async function AdminHomePage() {
         </Link>
 
         <Link href="/admin/dashboard" className={tileClass}>
-          Дашборд
+          Статистика
           <span className="text-xs font-normal text-muted">месяц цифрами</span>
         </Link>
         <Link href="/admin/payroll" className={tileClass}>
