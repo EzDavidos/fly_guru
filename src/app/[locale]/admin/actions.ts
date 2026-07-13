@@ -257,7 +257,52 @@ export async function updateSessionAction(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
+// Удаление сессии: чек уходит из выручки и ЗП месяца. Если это списание минут
+// с абонемента — минуты возвращаются (остаток считается по сессиям), статус
+// абонемента пересчитывается.
+export async function deleteSessionAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { data: s } = await supabase
+    .from("sessions")
+    .select("subscription_id")
+    .eq("id", id)
+    .maybeSingle();
+  const { error } = await supabase.from("sessions").delete().eq("id", id);
+  if (error) {
+    console.error("[admin] session delete error:", error.message);
+    return;
+  }
+  if (s?.subscription_id) {
+    await recalcSubscriptionStatus(supabase, s.subscription_id);
+  }
+  revalidatePath("/", "layout");
+}
+
 // ── Абонементы (подэтап 4.3) ─────────────────────────────────────────────────
+// Пересчёт статуса по остатку минут: кончились ↔ снова появились.
+// Истёкший (expired) не воскрешаем.
+async function recalcSubscriptionStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  subId: string,
+) {
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("id, total_minutes, status")
+    .eq("id", subId)
+    .maybeSingle();
+  if (sub && (sub.status === "active" || sub.status === "used_up")) {
+    const left = await minutesLeft(supabase, sub);
+    const next = left <= 0 ? "used_up" : "active";
+    if (next !== sub.status) {
+      await supabase.from("subscriptions").update({ status: next }).eq("id", subId);
+    }
+  }
+}
+
 // Продажа от админа: как у инструктора, но продавца выбираем (его 10% комиссия
 // после оплаты) и дату можно поставить прошлую. Цена по умолчанию — 6 000 000 ₫.
 export async function adminSellSubscriptionAction(
@@ -360,22 +405,32 @@ export async function adjustMinutesAction(
   });
   if (error) return { error: `Не удалось сохранить корректировку: ${error.message}` };
 
-  // Пересчёт статуса: минуты кончились ↔ снова появились.
-  const { data: sub } = await supabase
-    .from("subscriptions")
-    .select("id, total_minutes, status")
-    .eq("id", subId)
-    .maybeSingle();
-  if (sub && (sub.status === "active" || sub.status === "used_up")) {
-    const left = await minutesLeft(supabase, sub);
-    const next = left <= 0 ? "used_up" : "active";
-    if (next !== sub.status) {
-      await supabase.from("subscriptions").update({ status: next }).eq("id", subId);
-    }
-  }
+  await recalcSubscriptionStatus(supabase, subId);
 
   revalidatePath("/", "layout");
   redirect("/admin/subscriptions");
+}
+
+// Удаление абонемента: вместе с ним удаляются его списания (иначе FK оставит
+// «пустые» сессии без абонемента) и корректировки (cascade в БД). Выручка и
+// комиссия месяца оплаты пересчитаются сами. Членство клиента не трогаем.
+export async function deleteSubscriptionAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { error: sessionsError } = await supabase
+    .from("sessions")
+    .delete()
+    .eq("subscription_id", id);
+  if (sessionsError) {
+    console.error("[admin] subscription writeoffs delete error:", sessionsError.message);
+    return;
+  }
+  const { error } = await supabase.from("subscriptions").delete().eq("id", id);
+  if (error) console.error("[admin] subscription delete error:", error.message);
+  revalidatePath("/", "layout");
 }
 
 // ── Клиенты (подэтап 4.4) ────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { CopyLink } from "../CopyLink";
-import { ConfirmSubmit } from "../subscriptions/SubscriptionForms";
+import { ConfirmSubmit } from "../ConfirmSubmit";
 import { deleteMaterialAction } from "../actions";
 import { MaterialCreateForm, MaterialEditForm } from "./MaterialForms";
 

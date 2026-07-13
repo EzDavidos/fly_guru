@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useState } from "react";
 import { adminSellSubscriptionAction, adjustMinutesAction } from "../actions";
 
 // Клиентские кусочки страницы абонементов: две формы с ошибками без
-// перезагрузки (useActionState) и submit-кнопка с браузерным confirm().
+// перезагрузки (useActionState). Кнопка с confirm() — в ../ConfirmSubmit.
 
 export interface Option {
   id: string;
@@ -160,29 +160,5 @@ export function AdjustMinutesForm({ subscriptionId }: { subscriptionId: string }
         {pending ? "Сохраняем…" : "Скорректировать минуты"}
       </button>
     </form>
-  );
-}
-
-// Submit с подтверждением — для действий, которые трогают уже посчитанные
-// деньги (снятие отметки оплаты).
-export function ConfirmSubmit({
-  message,
-  className,
-  children,
-}: {
-  message: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="submit"
-      className={className}
-      onClick={(e) => {
-        if (!confirm(message)) e.preventDefault();
-      }}
-    >
-      {children}
-    </button>
   );
 }

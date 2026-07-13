@@ -3,12 +3,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { vnToday } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
-import { togglePaidAction } from "../actions";
-import {
-  SellSubscriptionForm,
-  AdjustMinutesForm,
-  ConfirmSubmit,
-} from "./SubscriptionForms";
+import { deleteSubscriptionAction, togglePaidAction } from "../actions";
+import { ConfirmSubmit } from "../ConfirmSubmit";
+import { SellSubscriptionForm, AdjustMinutesForm } from "./SubscriptionForms";
 
 export const metadata: Metadata = { title: "Админка · Абонементы" };
 
@@ -145,6 +142,16 @@ function SubscriptionCard({
             </ul>
           </div>
         )}
+
+        <form action={deleteSubscriptionAction} className="mt-4 border-t border-line/70 pt-3">
+          <input type="hidden" name="id" value={s.id} />
+          <ConfirmSubmit
+            message="Удалить абонемент? Его списания и корректировки удалятся безвозвратно, выручка и комиссия за месяц оплаты пересчитаются. Членство клиента останется."
+            className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-red-500 hover:text-red-500"
+          >
+            Удалить абонемент
+          </ConfirmSubmit>
+        </form>
       </div>
     </details>
   );

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { vnCurrentMonth, vnPeriod, vnToday } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
-import { updateSessionAction } from "../actions";
+import { deleteSessionAction, updateSessionAction } from "../actions";
+import { ConfirmSubmit } from "../ConfirmSubmit";
 import { SessionCreateForm } from "./SessionCreateForm";
 
 export const metadata: Metadata = { title: "Админка · Сессии" };
@@ -134,6 +135,20 @@ function SessionCard({
         >
           Сохранить
         </button>
+      </form>
+
+      <form action={deleteSessionAction} className="border-t border-line/70 p-4 pt-3">
+        <input type="hidden" name="id" value={s.id} />
+        <ConfirmSubmit
+          message={
+            isWriteoff
+              ? `Удалить списание? ${s.minutes_used ?? 0} мин вернутся на абонемент клиента.`
+              : "Удалить сессию? Чек уйдёт из выручки и ЗП инструктора за месяц."
+          }
+          className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-red-500 hover:text-red-500"
+        >
+          Удалить сессию
+        </ConfirmSubmit>
       </form>
     </details>
   );
