@@ -187,7 +187,7 @@ export default async function AdminSubscriptionsPage({
     ? await Promise.all([
         supabase
           .from("sessions")
-          .select("subscription_id, minutes_used, date")
+          .select("subscription_id, minutes_used, date, instructor:users!instructor_id(name)")
           .in("subscription_id", ids),
         supabase
           .from("subscription_adjustments")
@@ -205,9 +205,10 @@ export default async function AdminSubscriptionsPage({
   for (const r of usedRes.data ?? []) {
     const id = r.subscription_id as string;
     usedBySub.set(id, (usedBySub.get(id) ?? 0) + (r.minutes_used ?? 0));
+    const instructor = (r.instructor as unknown as { name: string } | null)?.name ?? "?";
     push(id, {
       at: r.date as string,
-      text: `${fmtDay(r.date as string)} · списание ${r.minutes_used ?? 0} мин`,
+      text: `${fmtDay(r.date as string)} · списание ${r.minutes_used ?? 0} мин — ${instructor}`,
     });
   }
   const adjBySub = new Map<string, number>();
