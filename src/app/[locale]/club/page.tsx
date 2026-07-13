@@ -2,29 +2,33 @@ import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Card, Button, Badge } from "@/components/ui";
 import { IconCheck, IconWaves, IconPin, IconClub } from "@/components/icons";
 import { Media, VideoLoop } from "@/components/Media";
-import { getService, formatVnd, formatDuration } from "@/content/services";
+import { formatVnd, formatDuration } from "@/content/services";
 import { BookingForm } from "@/components/BookingForm";
-import { getActiveServices } from "@/lib/services";
+import { getActiveServices, getSiteServices, pickService } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Клуб" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
 
 export default async function ClubPage() {
   // Все активные услуги из базы — на клубе человек может выбрать любую.
-  const services = await getActiveServices();
+  // Цены карточек — тоже из базы (правятся в админке, /admin/services).
+  const [services, site] = await Promise.all([
+    getActiveServices(),
+    getSiteServices(),
+  ]);
   const defaultServiceId = services.find(
-    (s) => s.name === getService("subscription").name,
+    (s) => s.name === pickService(site, "subscription").name,
   )?.id;
 
-  const sub = getService("subscription");
-  const rental = getService("rental");
+  const sub = pickService(site, "subscription");
+  const rental = pickService(site, "rental");
 
   // Аргумент выгоды считаем из данных, чтобы не разошлось с прайсом.
   const subPerMin = Math.round((sub.price as number) / (sub.durationMin as number)); // 20 000
   const rentalPerMin = Math.round((rental.price as number) / (rental.durationMin as number)); // 33 333
   const fmtK = (v: number) => `${Math.round(v / 1000)}к ₫/мин`;
 
-  const tours = [getService("excursion"), getService("safari")];
+  const tours = [pickService(site, "excursion"), pickService(site, "safari")];
 
   // Фото к карточкам выездов — по id услуги.
   const tourPhoto: Record<string, { src: string; alt: string }> = {

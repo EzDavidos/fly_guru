@@ -1,6 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ServiceOption } from "@/components/BookingForm";
-import type { ServiceCategory } from "@/content/services";
+import {
+  services as contentServices,
+  type Service,
+  type ServiceCategory,
+} from "@/content/services";
 
 // «Достать список активных услуг из базы» для выпадающего списка в форме.
 //
@@ -28,4 +32,37 @@ export async function getActiveServices(
     return [];
   }
   return (data ?? []).map((s) => ({ id: s.id, name: s.name }));
+}
+
+// Услуги для публичных страниц: тексты и описания — из контента
+// (content/services.ts), цены и длительность — из базы (правятся в админке).
+// Связь по services.code (миграция 0010). Нет строки в базе или цена пуста —
+// остаётся значение из файла: сайт не ломается даже на пустой базе.
+export async function getSiteServices(): Promise<Service[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("services")
+    .select("code, price, duration_min")
+    .not("code", "is", null);
+  if (error) {
+    console.error("[services] site prices load error:", error.message);
+    return contentServices;
+  }
+  const byCode = new Map((data ?? []).map((r) => [r.code as string, r]));
+  return contentServices.map((s) => {
+    const db = byCode.get(s.id);
+    if (!db) return s;
+    return {
+      ...s,
+      price: db.price != null ? Number(db.price) : s.price,
+      durationMin: db.duration_min ?? s.durationMin,
+    };
+  });
+}
+
+// getService для списка из getSiteServices (в контенте есть все id сайта).
+export function pickService(list: Service[], id: string): Service {
+  const s = list.find((x) => x.id === id);
+  if (!s) throw new Error(`Unknown service id: ${id}`);
+  return s;
 }

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Badge } from "@/components/ui";
 import {
-  services,
   CATEGORY_LABELS,
   formatVnd,
   formatDuration,
   type ServiceCategory,
 } from "@/content/services";
+import { getSiteServices } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Прайс" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
@@ -14,7 +14,9 @@ export const dynamic = "force-static"; // статичная страница, �
 // Порядок групп в прайсе.
 const ORDER: ServiceCategory[] = ["training", "tandem", "rental", "subscription", "tour", "extra"];
 
-export default function PricesPage() {
+export default async function PricesPage() {
+  // Цены из базы (правятся в админке); тексты и примечания — из контента.
+  const services = await getSiteServices();
   return (
     <Section className="pt-10 sm:pt-14">
       <Container>

@@ -1,20 +1,24 @@
 import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Card, Button } from "@/components/ui";
 import { Media } from "@/components/Media";
-import { getService, formatVnd, formatDuration } from "@/content/services";
+import { formatVnd, formatDuration } from "@/content/services";
 import { BookingForm } from "@/components/BookingForm";
-import { getActiveServices } from "@/lib/services";
+import { getActiveServices, getSiteServices, pickService } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Тандем" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
 
 export default async function TandemPage() {
-  // Услуги тандема из базы (с настоящими id) — для формы записи.
-  const services = await getActiveServices("tandem");
+  // Услуги тандема из базы (с настоящими id) — для формы записи;
+  // цены карточек — тоже из базы (правятся в админке, /admin/services).
+  const [services, site] = await Promise.all([
+    getActiveServices("tandem"),
+    getSiteServices(),
+  ]);
 
   const options = [
-    getService("tandem-adult"),
-    getService("tandem-kid"),
+    pickService(site, "tandem-adult"),
+    pickService(site, "tandem-kid"),
   ];
 
   return (

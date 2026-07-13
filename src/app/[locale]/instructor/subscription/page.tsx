@@ -1,11 +1,12 @@
-import { getService, formatVnd } from "@/content/services";
+import { formatVnd } from "@/content/services";
+import { getSiteServices, pickService } from "@/lib/services";
 import { SubscriptionForm } from "./SubscriptionForm";
 
 // Продажа абонемента: 300 минут / 6 млн ₫, минуты живут 3 месяца.
 // Создаёт subscription (sold_by = инструктор) и членство клуба, если его нет.
 
-export default function SubscriptionPage() {
-  const sub = getService("subscription");
+export default async function SubscriptionPage() {
+  const sub = pickService(await getSiteServices(), "subscription");
 
   return (
     <div>

@@ -3,26 +3,30 @@ import { Container, Section, SectionHeading, Card, Button, Badge } from "@/compo
 import { Media, VideoPlayer } from "@/components/Media";
 import { Faq } from "@/components/Faq";
 import { IconCheck } from "@/components/icons";
-import { getService, formatVnd, formatDuration } from "@/content/services";
+import { formatVnd, formatDuration } from "@/content/services";
 import { trainingFaq } from "@/content/faq";
 import { BookingForm } from "@/components/BookingForm";
-import { getActiveServices } from "@/lib/services";
+import { getActiveServices, getSiteServices, pickService } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Обучение" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
 
 export default async function TrainingPage() {
-  // Услуги обучения из базы (с настоящими id) — для выпадающего списка в форме.
-  const services = await getActiveServices("training");
+  // Услуги обучения из базы (с настоящими id) — для выпадающего списка в
+  // форме; цены карточек — тоже из базы (правятся в админке, /admin/services).
+  const [services, site] = await Promise.all([
+    getActiveServices("training"),
+    getSiteServices(),
+  ]);
   // Заранее выбираем «взрослый базовый» — самый популярный вариант.
   const defaultServiceId = services.find(
-    (s) => s.name === getService("basic-adult").name,
+    (s) => s.name === pickService(site, "basic-adult").name,
   )?.id;
 
   const options = [
-    { s: getService("basic-adult"), highlight: true, desc: "Индивидуальное занятие для взрослого с нуля." },
-    { s: getService("basic-kid"), highlight: false, desc: "Отдельная программа для детей до 14 лет." },
-    { s: getService("basic-duo"), highlight: false, desc: "Учитесь вдвоём — по очереди на одной доске." },
+    { s: pickService(site, "basic-adult"), highlight: true, desc: "Индивидуальное занятие для взрослого с нуля." },
+    { s: pickService(site, "basic-kid"), highlight: false, desc: "Отдельная программа для детей до 14 лет." },
+    { s: pickService(site, "basic-duo"), highlight: false, desc: "Учитесь вдвоём — по очереди на одной доске." },
   ];
 
   return (
