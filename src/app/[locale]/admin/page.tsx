@@ -23,17 +23,6 @@ function CountBubble({ count }: { count: number }) {
 const tileClass =
   "relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border border-line bg-surface p-4 text-sm font-semibold transition-colors hover:border-primary";
 
-// Раздел ещё не готов: серая плитка без ссылки, чтобы структура кабинета
-// была видна сразу, а включение раздела не двигало кнопки местами.
-function SoonTile({ label }: { label: string }) {
-  return (
-    <div className={`${tileClass} cursor-default opacity-45 hover:border-line`}>
-      {label}
-      <span className="text-xs font-normal text-muted">скоро</span>
-    </div>
-  );
-}
-
 export default async function AdminHomePage() {
   const user = await getAppUser();
   if (!user) return null; // layout уже средиректил бы; страховка для типов
@@ -143,7 +132,10 @@ export default async function AdminHomePage() {
           <span className="text-xs font-normal text-muted">ЗП · агенты · CSV</span>
         </Link>
 
-        <SoonTile label="Услуги" />
+        <Link href="/admin/services" className={tileClass}>
+          Услуги
+          <span className="text-xs font-normal text-muted">цены · справочник</span>
+        </Link>
         <Link href="/instructor/settings" className={tileClass}>
           Настройки
           <span className="text-xs font-normal text-muted">имя · фото</span>

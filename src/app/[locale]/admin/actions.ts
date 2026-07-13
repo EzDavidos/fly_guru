@@ -569,3 +569,81 @@ export async function cancelBookingAction(formData: FormData) {
   if (!id) return;
   await updateBooking(id, { status: "cancelled", pinned: false });
 }
+
+// ── Услуги (подэтап 4.10) ────────────────────────────────────────────────────
+// Справочник services — источник для форм записи, сессий и статистики.
+// Удаления нет: на услуги ссылаются bookings и sessions, вместо этого тумблер
+// active. Категория задаётся один раз при создании — от неё зависит логика
+// (subscription заблокирован в формах сессий).
+
+const SERVICE_CATEGORIES = [
+  "training",
+  "tandem",
+  "rental",
+  "tour",
+  "subscription",
+  "extra",
+];
+
+// Правка названия, цены и длительности. Пустая цена/длительность = null
+// («по запросу» / без фиксированной длительности).
+export async function updateServiceAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id || !name) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("services")
+    .update({
+      name,
+      price: parseVnd(formData.get("price")),
+      duration_min: intOrNull(formData.get("duration")),
+    })
+    .eq("id", id);
+  if (error) console.error("[admin] service update error:", error.message);
+  revalidatePath("/", "layout");
+}
+
+// Вкл/выкл: неактивная услуга исчезает из форм, история остаётся целой.
+export async function toggleServiceActiveAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("services")
+    .update({ active: formData.get("active") !== "1" })
+    .eq("id", id);
+  if (error) console.error("[admin] service toggle error:", error.message);
+  revalidatePath("/", "layout");
+}
+
+export async function createServiceAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const name = String(formData.get("name") ?? "").trim();
+  const category = String(formData.get("category") ?? "");
+  if (!name) return { error: "Укажите название услуги." };
+  if (!SERVICE_CATEGORIES.includes(category)) {
+    return { error: "Выберите категорию." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("services").insert({
+    name,
+    category,
+    price: parseVnd(formData.get("price")),
+    duration_min: intOrNull(formData.get("duration")),
+  });
+  if (error) {
+    return { error: `Не удалось создать услугу: ${error.message}` };
+  }
+  revalidatePath("/", "layout");
+  redirect("/admin/services"); // redirect = чистая форма после успеха
+}
