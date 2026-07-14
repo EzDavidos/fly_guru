@@ -359,10 +359,9 @@ export default async function AdminDashboardPage({
   const catBase = { sort, dir }; // фильтры сбрасывать сортировку не должны
 
   return (
-    // Кабинет зажат в узкую колонку (max-w-md в layout) — для телефона это
-    // правильно, но статистике на ПК нужна ширина. Вырываемся из колонки:
-    // блок центрируется по вьюпорту и растёт до 72rem, не вызывая скролла.
-    <div className="lg:relative lg:left-1/2 lg:w-[min(72rem,calc(100vw-3rem))] lg:-translate-x-1/2">
+    // Ширину задаёт колонка контента в layout кабинета (как у остальных
+    // вкладок) — отдельного «вырывания» на всю ширину больше нет.
+    <div>
       <h1 className="text-2xl font-bold">Статистика</h1>
       <p className="mt-1 text-sm capitalize text-muted">{label}</p>
 

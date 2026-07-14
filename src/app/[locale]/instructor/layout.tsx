@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth";
-import { CabinetHeader } from "./CabinetHeader";
+import { createClient } from "@/lib/supabase/server";
+import { vnCurrentMonth } from "@/lib/dates";
+import { getInstructorStats, vnd } from "@/lib/stats";
+import { Sidebar } from "./Sidebar";
 
 export const metadata: Metadata = { title: "Кабинет инструктора" };
 
-// Кабинет инструктора: mobile-first, узкая колонка. Навигация — крупные кнопки
-// на главном экране, на подстраницах ссылка «← Кабинет» (CabinetHeader).
+// Кабинет инструктора: слева боковое меню (на ПК — колонка, на телефоне —
+// разворачиваемая плашка), справа — контент активного раздела.
 // Доступ уже проверил middleware (быстрый рубеж), здесь — второй рубеж
 // с чтением роли из БД, третий — RLS в самой базе.
 export default async function InstructorLayout({
@@ -15,14 +18,38 @@ export default async function InstructorLayout({
 }) {
   const user = await requireRole("instructor", "/instructor");
 
-  // Админ попадает сюда на общие страницы (например, настройки) — стрелка
-  // «назад» должна вести его в админку, а не в инструкторский кабинет.
-  const home = user.role === "admin" ? "/admin" : "/instructor";
+  // Данные для карточки профиля в сайдбаре: ЗП за месяц и число активных
+  // записей (красный счётчик). Раньше считались на главном экране.
+  const supabase = await createClient();
+  const month = vnCurrentMonth();
+  const [stats, { count }] = await Promise.all([
+    getInstructorStats(supabase, user.id, month),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "confirmed")
+      .is("accepted_by", null),
+  ]);
+  const activeCount = count ?? 0;
 
   return (
-    <div className="mx-auto w-full max-w-md px-4 pb-16 pt-6">
-      <CabinetHeader home={home} label={user.role === "admin" ? "Админка" : "Кабинет"} />
-      {children}
+    // На ПК — app-shell: область кабинета фиксированной высоты (вьюпорт минус
+    // шапка ~4rem), сайдбар и контент скроллятся независимо (крутится та
+    // колонка, над которой мышь; левый бар не уезжает). На телефоне — обычный
+    // скролл страницы, меню сверху разворачивается.
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:h-[calc(100dvh-4rem)] md:py-0">
+      <div className="md:flex md:h-full md:gap-6">
+        <Sidebar
+          name={user.name}
+          photoUrl={user.photo_url}
+          amountLabel={vnd(stats.salary)}
+          amountSub={`ЗП за ${month.label} · клиентов: ${stats.clientsCount}`}
+          activeCount={activeCount}
+        />
+        <main className="scroll-soft mt-4 min-w-0 md:mt-0 md:flex-1 md:overflow-y-auto md:overscroll-contain md:py-6">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
