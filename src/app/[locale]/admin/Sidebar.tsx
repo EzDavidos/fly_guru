@@ -27,7 +27,7 @@ const NAV: NavItem[] = [
   { href: "/admin/dashboard", label: "Статистика", hint: "месяц цифрами" },
   { href: "/admin/payroll", label: "Расчёт месяца", hint: "ЗП · агенты · CSV" },
   { href: "/admin/services", label: "Услуги", hint: "цены · справочник" },
-  { href: "/instructor/settings", label: "Настройки", hint: "имя · фото" },
+  { href: "/admin/settings", label: "Настройки", hint: "имя · фото" },
 ];
 
 function CountBubble({ count }: { count: number }) {

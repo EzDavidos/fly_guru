@@ -15,11 +15,15 @@ export function SettingsForm({
   photoUrl,
   age,
   monthlyGoal,
+  showGoal = true,
 }: {
   name: string;
   photoUrl: string | null;
   age: number | null;
   monthlyGoal: number | null;
+  // Цель по ЗП питает прогресс-бар на главном экране инструктора. У админа
+  // такого экрана нет — прячем поле (форму саму переиспользуем как есть).
+  showGoal?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     updateProfileAction,
@@ -119,23 +123,25 @@ export function SettingsForm({
         />
       </div>
 
-      <div>
-        <label htmlFor="monthly_goal" className="mb-1 block text-sm font-medium">
-          Цель по ЗП на месяц, ₫
-        </label>
-        <input
-          id="monthly_goal"
-          name="monthly_goal"
-          type="text"
-          inputMode="numeric"
-          placeholder="20 000 000"
-          defaultValue={monthlyGoal ?? ""}
-          className={inputClass}
-        />
-        <p className="mt-1 text-xs text-muted">
-          Пустое поле — прогресс-бар на главном экране не показывается.
-        </p>
-      </div>
+      {showGoal && (
+        <div>
+          <label htmlFor="monthly_goal" className="mb-1 block text-sm font-medium">
+            Цель по ЗП на месяц, ₫
+          </label>
+          <input
+            id="monthly_goal"
+            name="monthly_goal"
+            type="text"
+            inputMode="numeric"
+            placeholder="20 000 000"
+            defaultValue={monthlyGoal ?? ""}
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-muted">
+            Пустое поле — прогресс-бар на главном экране не показывается.
+          </p>
+        </div>
+      )}
 
       <button
         type="submit"
