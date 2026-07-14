@@ -74,6 +74,18 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(home, request.url));
   }
 
+  // Кабинеты открываются сразу на вкладке заявок — разделы живут в боковом
+  // меню (layout → Sidebar). Мгновенный серверный редирект (без meta-refresh
+  // от пререндера). Языковой префикс сохраняем (для en/vi он есть в pathname).
+  const prefix = request.nextUrl.pathname.slice(
+    0,
+    request.nextUrl.pathname.length - path.length,
+  );
+  if (path === "/admin")
+    return NextResponse.redirect(new URL(`${prefix}/admin/bookings`, request.url));
+  if (path === "/instructor")
+    return NextResponse.redirect(new URL(`${prefix}/instructor/bookings`, request.url));
+
   return response;
 }
 
