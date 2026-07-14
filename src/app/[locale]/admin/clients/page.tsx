@@ -20,6 +20,7 @@ interface ClientRow {
   referrer_id: string | null;
   internal_note: string | null;
   age: number | null;
+  city: string | null;
   created_at: string;
 }
 
@@ -101,6 +102,7 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
           <p>
             В базе с {fmtDay(c.created_at)}
             {c.age !== null && ` · ${c.age} лет`}
+            {c.city && ` · ${c.city}`}
           </p>
           <p>
             Занятий: {stats.sessions} · потратил{" "}
@@ -142,6 +144,15 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
                 className={`mt-1 ${inputClass}`}
               />
             </label>
+            <label className="text-xs text-muted">
+              Город
+              <input
+                type="text"
+                name="city"
+                defaultValue={c.city ?? ""}
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
           </div>
           <label className="mt-2 block text-xs text-muted">
             Внутренняя заметка (клиент не видит)
@@ -178,7 +189,7 @@ export default async function AdminClientsPage({
     supabase
       .from("clients")
       .select(
-        "id, name, phone, source, referrer_type, referrer_id, internal_note, age, created_at",
+        "id, name, phone, source, referrer_type, referrer_id, internal_note, age, city, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(1000),

@@ -40,6 +40,7 @@ async function findOrCreateClient(
     name: string;
     phone: string;
     source: "site" | "offline";
+    city?: string | null;
     referrer?: { type: "agent"; id: string } | null;
   },
 ): Promise<{ id: string; existingName?: string } | { error: string }> {
@@ -61,6 +62,7 @@ async function findOrCreateClient(
     .insert({
       name: input.name,
       phone: phoneDigits(input.phone) || input.phone,
+      city: input.city || null,
       source: input.referrer ? "agent" : input.source,
       referrer_type: input.referrer?.type ?? null,
       referrer_id: input.referrer?.id ?? null,
@@ -121,8 +123,13 @@ export async function recordClientAction(
 
   const name = String(formData.get("name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const city = String(formData.get("city") ?? "").trim();
   const serviceId = String(formData.get("serviceId") ?? "");
-  const date = String(formData.get("date") ?? "") || vnToday();
+  // Инструктор работает только в рамках сегодняшнего дня: дату занятия НЕ
+  // берём из формы (её там больше нет), а жёстко ставим текущий день по
+  // Вьетнаму. Записи задним/будущим числом оформляет только админ. Ошибся
+  // инструктор — сообщает админу, тот правит через админку.
+  const date = vnToday();
   const bookingId = String(formData.get("bookingId") ?? "") || null;
 
   if (!name || !phone || !serviceId) {
@@ -156,6 +163,7 @@ export async function recordClientAction(
   const clientResult = await findOrCreateClient(supabase, user, {
     name,
     phone,
+    city,
     source: bookingId ? "site" : "offline",
     referrer: agent ? { type: "agent", id: agent.id } : null,
   });
@@ -174,9 +182,11 @@ export async function recordClientAction(
     return { error: "Абонемент оформляется через «Продажу абонемента»." };
   }
 
-  // Чек. Скидка по реф-ссылке действует только на базовое обучение.
+  // Чек. Скидка −200к действует только по коду АГЕНТА и только на базовое
+  // обучение. Личный код инструктора (c2) в booking.ref_code скидку НЕ даёт —
+  // поэтому завязываемся на распознанного агента, а не на сам факт ref_code.
   let amount = Number(service.price ?? 0);
-  const discounted = Boolean(refCode) && service.category === "training";
+  const discounted = Boolean(agent) && service.category === "training";
   if (discounted) amount = Math.max(0, amount - REF_DISCOUNT);
 
   const { error: sessionError } = await supabase.from("sessions").insert({
@@ -419,4 +429,39 @@ export async function updateProfileAction(
   // Имя и фото видны на главном экране кабинета и в бейдже шапки.
   revalidatePath("/", "layout");
   redirect("/instructor");
+}
+
+// ── Личная реф-ссылка инструктора (пак C) ─────────────────────────────────────
+// Код 6 символов без похожих знаков (0/O, 1/l) — диктуют вслух. Крошечный
+// генератор дублирует админский (createAgentAction) намеренно, чтобы не тянуть
+// серверную зависимость между кабинетами.
+const REF_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+function randomRefCode(): string {
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)];
+  }
+  return code;
+}
+
+// Создать личный код инструктору, если его ещё нет. Пишем под service_role
+// (у users нет политики «обновить свою строку»), строго в свою строку и только
+// когда ref_code пуст (`.is("ref_code", null)` — защита от гонки и повторов).
+export async function createMyRefCodeAction() {
+  const user = await requireStaff();
+  if (user.role !== "instructor") return;
+
+  // `.is("ref_code", null)` — и защита от гонки, и от повторного клика: если код
+  // уже есть, update просто не найдёт строку и ничего не перезапишет.
+  const admin = createAdminClient();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { error } = await admin
+      .from("users")
+      .update({ ref_code: randomRefCode() })
+      .eq("id", user.id)
+      .is("ref_code", null);
+    if (!error) break;
+    if (error.code !== "23505") break; // не unique-конфликт — повтор не поможет
+  }
+  revalidatePath("/instructor/record");
 }

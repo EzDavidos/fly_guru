@@ -67,6 +67,21 @@ export function RecordForm({ services, today, prefill }: RecordFormProps) {
         />
       </div>
 
+      {/* Город — только для НОВОГО клиента (у существующего берётся из карточки
+          и не перезаписывается). Необязательное поле. */}
+      <div>
+        <label htmlFor="city" className="mb-1 block text-sm font-medium">
+          Город
+        </label>
+        <input
+          id="city"
+          name="city"
+          type="text"
+          placeholder="Nha Trang"
+          className={inputClass}
+        />
+      </div>
+
       <div>
         <label htmlFor="serviceId" className="mb-1 block text-sm font-medium">
           Услуга *
@@ -86,11 +101,13 @@ export function RecordForm({ services, today, prefill }: RecordFormProps) {
         </select>
       </div>
 
+      {/* Инструктор записывает только текущим днём — дату не выбирают, просто
+          показываем её. Записи задним числом делает админ. */}
       <div>
-        <label htmlFor="date" className="mb-1 block text-sm font-medium">
-          Дата занятия
-        </label>
-        <input id="date" name="date" type="date" defaultValue={today} className={inputClass} />
+        <span className="mb-1 block text-sm font-medium">Дата занятия</span>
+        <p className="rounded-xl border border-line bg-surface px-4 py-3 text-base text-muted">
+          Сегодня, {today}
+        </p>
       </div>
 
       <button

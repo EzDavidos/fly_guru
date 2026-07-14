@@ -452,6 +452,7 @@ export async function updateClientAction(formData: FormData) {
       name,
       phone: phoneRaw ? phoneDigits(phoneRaw) || phoneRaw : null,
       age: Number.isFinite(ageNum) && ageNum > 0 ? ageNum : null,
+      city: String(formData.get("city") ?? "").trim() || null,
       internal_note: String(formData.get("note") ?? "").trim() || null,
     })
     .eq("id", id);

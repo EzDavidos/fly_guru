@@ -9,21 +9,34 @@ import { getService } from "@/content/services";
 import { BookingForm } from "@/components/BookingForm";
 import { RefVisitLogger } from "@/components/RefVisitLogger";
 
-// Реф-лендинг: гость приходит по личной ссылке агента или члена клуба /r/<код>.
-// Отдельная страница (динамическая) — код проверяется в базе при каждом заходе,
-// поэтому force-static здесь НЕ ставим.
+// Реф-лендинг: гость приходит по личной ссылке /r/<код>. Ссылка бывает двух
+// видов: агентская (даёт скидку −200к на базовое) и инструкторская (без скидки,
+// просто «пришёл к этому инструктору»). Страница динамическая — код проверяется
+// в базе при каждом заходе, поэтому force-static здесь НЕ ставим.
 
-// Проверка кода: есть ли активный агент с таким ref_code.
+type RefKind = "agent" | "instructor" | null;
+
+// Что за код: активный агент, инструктор с личным кодом (пак C) — или мусор.
 // (Реф-коды членов клуба появятся позже — Этап 5; здесь оставлен задел.)
-async function isValidRefCode(code: string): Promise<boolean> {
+async function resolveRefKind(code: string): Promise<RefKind> {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data: agent } = await supabase
     .from("agents")
     .select("id")
     .eq("ref_code", code)
     .eq("active", true)
     .maybeSingle();
-  return Boolean(data);
+  if (agent) return "agent";
+
+  const { data: instructor } = await supabase
+    .from("users")
+    .select("id")
+    .eq("ref_code", code)
+    .eq("role", "instructor")
+    .maybeSingle();
+  if (instructor) return "instructor";
+
+  return null;
 }
 
 export default async function ReferralLandingPage({
@@ -36,9 +49,13 @@ export default async function ReferralLandingPage({
 
   // Невалидный код (опечатка, устаревшая ссылка) — не показываем ошибку, а мягко
   // отправляем человека на обычную страницу обучения с обычной формой.
-  if (!(await isValidRefCode(code))) {
+  const kind = await resolveRefKind(code);
+  if (!kind) {
     redirect({ href: "/training", locale });
   }
+  // Скидка −200к — только по агентской ссылке. Инструкторская даёт прямую запись
+  // к инструктору без скидки, поэтому скидочные блоки для неё прячем.
+  const isAgent = kind === "agent";
 
   // Услуги обучения для формы + предвыбор «взрослый базовый».
   const services = await getActiveServices("training");
@@ -62,10 +79,14 @@ export default async function ReferralLandingPage({
               </h1>
               <p className="mt-4 max-w-lg text-lg text-muted">
                 90% наших гостей встают на крыло и едут самостоятельно уже в первый раз.
-                По этой ссылке — специальная скидка на базовое занятие.
+                {isAgent
+                  ? " По этой ссылке — специальная скидка на базовое занятие."
+                  : " Запишитесь напрямую к вашему инструктору."}
               </p>
               <div className="mt-8">
-                <Button href="#form" size="lg">Записаться со скидкой</Button>
+                <Button href="#form" size="lg">
+                  {isAgent ? "Записаться со скидкой" : "Записаться"}
+                </Button>
               </div>
             </div>
             <Media
@@ -111,33 +132,36 @@ export default async function ReferralLandingPage({
         </Container>
       </Section>
 
-      {/* Блок скидки */}
-      <Section>
-        <Container>
-          <div className="mx-auto max-w-2xl rounded-3xl border border-accent/30 bg-accent/5 p-8 text-center sm:p-10">
-            <Badge>Скидка по ссылке</Badge>
-            <h2 className="mt-4 text-2xl font-bold sm:text-3xl">Базовое занятие дешевле на 200 000 ₫</h2>
-            <div className="mt-6 flex items-baseline justify-center gap-3">
-              <span className="text-xl text-muted line-through">2 000 000 ₫</span>
-              <span className="text-4xl font-bold text-accent-strong">1 800 000 ₫</span>
+      {/* Блок скидки — только для агентской ссылки */}
+      {isAgent && (
+        <Section>
+          <Container>
+            <div className="mx-auto max-w-2xl rounded-3xl border border-accent/30 bg-accent/5 p-8 text-center sm:p-10">
+              <Badge>Скидка по ссылке</Badge>
+              <h2 className="mt-4 text-2xl font-bold sm:text-3xl">Базовое занятие дешевле на 200 000 ₫</h2>
+              <div className="mt-6 flex items-baseline justify-center gap-3">
+                <span className="text-xl text-muted line-through">2 000 000 ₫</span>
+                <span className="text-4xl font-bold text-accent-strong">1 800 000 ₫</span>
+              </div>
+              <p className="mt-3 text-sm text-muted">
+                Скидка применяется к базовому занятию (взрослый). Действует по этой ссылке.
+              </p>
+              <div className="mt-8">
+                <Button href="#form" size="lg">Записаться</Button>
+              </div>
             </div>
-            <p className="mt-3 text-sm text-muted">
-              Скидка применяется к базовому занятию (взрослый). Действует по этой ссылке.
-            </p>
-            <div className="mt-8">
-              <Button href="#form" size="lg">Записаться</Button>
-            </div>
-          </div>
-        </Container>
-      </Section>
+          </Container>
+        </Section>
+      )}
 
       {/* Форма записи с вшитым реф-кодом */}
       <Section id="form" tone="muted">
         <Container>
           <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
-            <h2 className="text-2xl font-bold">Запись со скидкой</h2>
+            <h2 className="text-2xl font-bold">{isAgent ? "Запись со скидкой" : "Запись"}</h2>
             <p className="mt-3 text-muted">
-              Оставьте контакт — свяжемся, подтвердим время и скидку.
+              Оставьте контакт — свяжемся, подтвердим время
+              {isAgent ? " и скидку." : "."}
             </p>
             <div className="mt-8">
               <BookingForm services={services} defaultServiceId={defaultServiceId} refCode={code} />
