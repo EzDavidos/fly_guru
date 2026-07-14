@@ -233,6 +233,13 @@ function BookingCard({
               </>
             )}
             {!terminal && (
+              // Провести заявку как занятие: открывает «Запись клиента» с
+              // предзаполненными полями; сохранение закроет заявку (done).
+              <Link href={`/admin/record?booking=${b.id}`} className={btnGhost}>
+                Провести → запись
+              </Link>
+            )}
+            {!terminal && (
               <button
                 formAction={setStatusAction.bind(null, "cancelled")}
                 className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-red-500 hover:text-red-500"

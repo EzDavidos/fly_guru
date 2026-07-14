@@ -159,6 +159,7 @@ async function resolveClient(
     .insert({
       name,
       phone: phoneDigits(phone) || phone,
+      city: String(formData.get("newCity") ?? "").trim() || null,
       source: "offline",
       created_by: adminId,
     })
@@ -170,9 +171,15 @@ async function resolveClient(
   return { id: created.id };
 }
 
+// Скидка по агентской реф-ссылке — 200 000 ₫ на базовое обучение (как в
+// кабинете инструктора). Применяется, когда админ записывает клиента из заявки.
+const REF_DISCOUNT = 200_000;
+
 // Создать сессию задним числом: инструктор забыл оформить занятие — админ
-// вносит его вручную на любую дату. Чек фиксируется в момент создания
-// (изменение прайса в будущем прошлые сессии не трогает).
+// вносит его вручную на любую дату. Тем же экшеном пользуется админская
+// «Запись клиента» (может закрыть заявку и учесть реф-скидку/награду — см.
+// bookingId ниже). Чек фиксируется в момент создания (изменение прайса в
+// будущем прошлые сессии не трогает).
 export async function createSessionAction(
   _prev: ActionState,
   formData: FormData,
@@ -205,9 +212,40 @@ export async function createSessionAction(
     return { error: "Абонемент оформляется на вкладке «Абонементы»." };
   }
 
-  // Пустая сумма = по прайсу; введённая вручную — важнее (скидки, брони и т.п.).
+  // Если запись закрывает заявку (админская «Запись клиента» из ?booking=id) —
+  // тянем её реф-код и, если это активный агент, готовим скидку и награду, как
+  // в кабинете инструктора. Форма сессий bookingId не шлёт — для неё блок no-op.
+  const bookingId = String(formData.get("bookingId") ?? "") || null;
+  let agent: { id: string; commission_fixed: number } | null = null;
+  if (bookingId) {
+    const { data: booking } = await supabase
+      .from("bookings")
+      .select("ref_code")
+      .eq("id", bookingId)
+      .maybeSingle();
+    if (booking?.ref_code) {
+      const { data } = await supabase
+        .from("agents")
+        .select("id, commission_fixed")
+        .eq("ref_code", booking.ref_code)
+        .eq("active", true)
+        .maybeSingle();
+      agent = data ?? null;
+    }
+  }
+
+  // Пустая сумма = по прайсу (с агентской скидкой −200к на базовое обучение);
+  // введённая вручную — важнее (админ решает: скидки, брони, доплаты).
   const amountRaw = String(formData.get("amount") ?? "").trim();
-  const amount = amountRaw ? parseVnd(amountRaw) : Number(service.price ?? 0);
+  let amount: number | null;
+  if (amountRaw) {
+    amount = parseVnd(amountRaw);
+  } else {
+    amount = Number(service.price ?? 0);
+    if (agent && service.category === "training") {
+      amount = Math.max(0, amount - REF_DISCOUNT);
+    }
+  }
   if (amount === null) return { error: "Сумма — число в донгах, например 1 500 000." };
 
   const { error: insError } = await supabase.from("sessions").insert({
@@ -219,6 +257,25 @@ export async function createSessionAction(
     created_by: admin.id,
   });
   if (insError) return { error: `Не удалось создать сессию: ${insError.message}` };
+
+  // Награда агенту (pending — подтвердится при статусе done или кнопкой) и
+  // закрытие заявки: запись доведена до занятия.
+  if (agent) {
+    const { error: rewardError } = await supabase.from("referral_rewards").insert({
+      referrer_type: "agent",
+      referrer_id: agent.id,
+      client_id: clientId,
+      reward_type: "money",
+      amount: agent.commission_fixed,
+    });
+    if (rewardError) console.error("[admin] reward insert error:", rewardError.message);
+  }
+  if (bookingId) {
+    await supabase
+      .from("bookings")
+      .update({ status: "done", client_id: clientId })
+      .eq("id", bookingId);
+  }
 
   // Сессия влияет на выручку, статистику и ЗП — перерисовываем всё.
   revalidatePath("/", "layout");
