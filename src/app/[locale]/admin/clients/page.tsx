@@ -21,6 +21,7 @@ interface ClientRow {
   internal_note: string | null;
   age: number | null;
   city: string | null;
+  tour_approved: boolean;
   created_at: string;
 }
 
@@ -80,6 +81,14 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
               .join(" · ")}
           </p>
         </div>
+        {c.tour_approved && (
+          <span
+            title="Допущен к выездам (экскурсия/сафари)"
+            className="rounded-full bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent-strong"
+          >
+            🏝 Выезды
+          </span>
+        )}
         {stats.activeSubs > 0 && (
           <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
             Абонемент
@@ -163,6 +172,19 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
               className={`mt-1 ${inputClass}`}
             />
           </label>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="tour_approved"
+              value="1"
+              defaultChecked={c.tour_approved}
+              className="h-4 w-4 rounded border-line text-primary focus:ring-primary"
+            />
+            <span>
+              🏝 Допущен к выездам
+              <span className="text-muted"> · экскурсия/сафари без абонемента</span>
+            </span>
+          </label>
           <button
             type="submit"
             className="mt-3 rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
@@ -189,7 +211,7 @@ export default async function AdminClientsPage({
     supabase
       .from("clients")
       .select(
-        "id, name, phone, source, referrer_type, referrer_id, internal_note, age, city, created_at",
+        "id, name, phone, source, referrer_type, referrer_id, internal_note, age, city, tour_approved, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(1000),

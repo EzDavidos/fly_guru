@@ -9,6 +9,7 @@ import {
   vnToday,
 } from "@/lib/dates";
 import { getInstructorStats, vnd, type StatsRange } from "@/lib/stats";
+import { setTourApprovedAction } from "../actions";
 
 // «Статистика» за произвольный период. По умолчанию — текущий месяц
 // (с 1-го числа); кнопка «Текущий месяц» всегда возвращает к нему, даже если
@@ -57,6 +58,16 @@ export default async function StatsPage({
   const stats = await getInstructorStats(supabase, user.id, range);
 
   const maxAmount = Math.max(...stats.clientBars.map((b) => b.amount), 1);
+
+  // Допуск к выездам (пак G) для клиентов периода — читаем обычным клиентом
+  // (у инструктора есть select на clients), тумблер пишет через service-role.
+  const barIds = stats.clientBars.map((b) => b.clientId);
+  const { data: approvedRows } = barIds.length
+    ? await supabase.from("clients").select("id, tour_approved").in("id", barIds)
+    : { data: [] };
+  const tourApproved = new Set(
+    (approvedRows ?? []).filter((r) => r.tour_approved).map((r) => r.id as string),
+  );
 
   return (
     <div>
@@ -170,12 +181,37 @@ export default async function StatsPage({
                     style={{ width: `${Math.max((c.amount / maxAmount) * 100, 2)}%` }}
                   />
                 </div>
+                {/* Допуск к выездам (пак G): тумблер ставит противоположное значение */}
+                <form action={setTourApprovedAction} className="mt-1">
+                  <input type="hidden" name="clientId" value={c.clientId} />
+                  <input
+                    type="hidden"
+                    name="approved"
+                    value={tourApproved.has(c.clientId) ? "0" : "1"}
+                  />
+                  {tourApproved.has(c.clientId) ? (
+                    <button
+                      type="submit"
+                      className="text-xs font-semibold text-accent-strong transition-colors hover:text-muted"
+                    >
+                      🏝 Допущен к выездам · снять
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      className="text-xs font-semibold text-muted transition-colors hover:text-primary"
+                    >
+                      Допустить к выездам
+                    </button>
+                  )}
+                </form>
               </div>
             ))}
           </div>
           <p className="mt-3 text-xs text-muted">
             Длина бара — сумма чеков клиента. Клиенты с абонементом (списания без
-            чека) показаны минутами.
+            чека) показаны минутами. «Допустить к выездам» — экскурсия/сафари без
+            абонемента, когда клиент уже уверенно катает.
           </p>
         </div>
       )}

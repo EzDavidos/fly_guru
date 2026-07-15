@@ -19,7 +19,7 @@ export interface Service {
   durationLabel?: string; // если длительность не в минутах («полдня», «целый день»)
   price: Vnd; // null = цена не определена (TODO/по запросу)
   category: ServiceCategory;
-  membersOnly?: boolean;
+  membersOnly?: boolean; // выезды: доступ по одобрению инструктора (пак G), не жёсткое членство
   note?: string;
 }
 

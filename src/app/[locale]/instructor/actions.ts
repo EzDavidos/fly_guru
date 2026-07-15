@@ -465,3 +465,21 @@ export async function createMyRefCodeAction() {
   }
   revalidatePath("/instructor/record");
 }
+
+// Допуск клиента к выездам (экскурсия/сафари) — пак G. Инструктор решает, что
+// клиент уже уверенно катает, и ставит флаг; жёсткого блока в записи нет.
+// Пишем под service_role: у инструктора нет update-политики на clients, а этот
+// экшен строго меняет одно поле после проверки роли — чужие данные не трогает.
+export async function setTourApprovedAction(formData: FormData) {
+  await requireStaff();
+  const clientId = String(formData.get("clientId") ?? "");
+  if (!clientId) return;
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("clients")
+    .update({ tour_approved: formData.get("approved") === "1" })
+    .eq("id", clientId);
+  if (error) console.error("[instructor] tour approval error:", error.message);
+  revalidatePath("/instructor/stats");
+}

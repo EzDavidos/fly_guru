@@ -511,6 +511,7 @@ export async function updateClientAction(formData: FormData) {
       age: Number.isFinite(ageNum) && ageNum > 0 ? ageNum : null,
       city: String(formData.get("city") ?? "").trim() || null,
       internal_note: String(formData.get("note") ?? "").trim() || null,
+      tour_approved: formData.get("tour_approved") === "1",
     })
     .eq("id", id);
   if (error) console.error("[admin] client update error:", error.message);

@@ -171,13 +171,13 @@ export default async function ClubPage() {
         </Container>
       </Section>
 
-      {/* Выезды — только для членов клуба */}
+      {/* Выезды — по одобрению инструктора */}
       <Section tone="muted">
         <Container>
           <SectionHeading
             eyebrow="Выезды"
             title="Экскурсия и сафари"
-            subtitle="Только для членов клуба. Требуется пройденное базовое обучение — неопытных в длительные выезды не берём."
+            subtitle="По одобрению инструктора: если уже уверенно катаете — можно и без абонемента. Неопытных в длительные выезды не берём."
           />
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             {tours.map((s) => (
@@ -191,7 +191,7 @@ export default async function ClubPage() {
                 />
                 <div className="mb-3 flex items-center gap-2">
                   <IconPin className="h-5 w-5 text-primary" />
-                  <Badge>Только для членов клуба</Badge>
+                  <Badge>По одобрению инструктора</Badge>
                 </div>
                 <h3 className="text-lg font-bold">{s.name}</h3>
                 <div className="mt-3 flex items-baseline gap-2">

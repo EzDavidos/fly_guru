@@ -43,7 +43,7 @@ export default async function PricesPage() {
                         <div className="font-medium">
                           {s.name}
                           {s.membersOnly && (
-                            <Badge className="ml-2 align-middle">Члены клуба</Badge>
+                            <Badge className="ml-2 align-middle">По одобрению инструктора</Badge>
                           )}
                         </div>
                         <div className="text-sm text-muted">
