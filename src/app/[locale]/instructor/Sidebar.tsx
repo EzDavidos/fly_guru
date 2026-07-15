@@ -19,6 +19,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: "/instructor/bookings", label: "Записи", hint: "от админа" },
   { href: "/instructor/record", label: "Записать клиента", hint: "новая сессия" },
+  { href: "/instructor/calendar", label: "Календарь", hint: "смены · записи" },
   { href: "/instructor/stats", label: "Статистика", hint: "за любой период" },
   { href: "/instructor/subscription", label: "Абонемент", hint: "продажа" },
   { href: "/instructor/writeoff", label: "Списание", hint: "минуты" },

@@ -886,3 +886,42 @@ export async function deleteExpenseAction(formData: FormData) {
   if (error) console.error("[admin] expense delete error:", error.message);
   revalidatePath("/", "layout");
 }
+
+// ── Смены / выходы (пак H1) ───────────────────────────────────────────────────
+// Админ ставит инструктору смену на день (планирование наперёд). unique-индекс
+// (instructor_id, date) гасит дубли — повторный клик не создаёт вторую строку.
+export async function assignShiftAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const instructorId = String(formData.get("instructorId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  if (!instructorId || !DAY_RE.test(date)) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("shifts").insert({
+    instructor_id: instructorId,
+    date,
+    note: String(formData.get("note") ?? "").trim() || null,
+    created_by: admin.id,
+  });
+  // 23505 = смена уже стоит, это не ошибка (гонка/повторный клик).
+  if (error && error.code !== "23505") {
+    console.error("[admin] shift assign error:", error.message);
+  }
+  revalidatePath("/", "layout");
+}
+
+export async function removeShiftAction(formData: FormData) {
+  await requireAdmin();
+  const instructorId = String(formData.get("instructorId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  if (!instructorId || !DAY_RE.test(date)) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("shifts")
+    .delete()
+    .eq("instructor_id", instructorId)
+    .eq("date", date);
+  if (error) console.error("[admin] shift remove error:", error.message);
+  revalidatePath("/", "layout");
+}
