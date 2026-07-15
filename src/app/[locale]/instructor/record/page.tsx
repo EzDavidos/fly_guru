@@ -63,7 +63,7 @@ export default async function RecordPage({
     <div>
       <h1 className="text-2xl font-bold">Записать клиента</h1>
       <p className="mt-1 text-sm text-muted">
-        Сессия запишется на вас — вы и получите 10% от чека.
+        Сессия запишется на вас — вы и получите 15% от чека.
       </p>
 
       {/* Личная реф-ссылка (пак C): дайте её клиенту вне дома — он запишется

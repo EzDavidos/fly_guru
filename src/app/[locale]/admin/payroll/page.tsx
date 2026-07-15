@@ -7,7 +7,7 @@ import { MonthSwitcher, resolveYm } from "../MonthSwitcher";
 
 export const metadata: Metadata = { title: "Админка · Расчёт месяца" };
 
-// Расчёт месяца: кому и сколько выплатить. Инструкторы — 10% сессий + 10%
+// Расчёт месяца: кому и сколько выплатить. Инструкторы — 15% сессий + 10%
 // оплаченных В ЭТОМ месяце абонементов (месяц оплаты, не продажи — цифры
 // совпадают со статистикой в кабинете инструктора). Агенты — награды,
 // подтверждённые в этом месяце. CSV — та же таблица файлом для архива.
@@ -57,7 +57,7 @@ export default async function AdminPayrollPage({
       </div>
 
       <section className="mt-3 rounded-2xl border border-line bg-surface p-4">
-        <h2 className="font-bold">Инструкторы · 10%</h2>
+        <h2 className="font-bold">Инструкторы · 15% сессий + 10% абонементов</h2>
         <div className="mt-3 space-y-4">
           {payroll.instructors.map((i) => (
             <div key={i.id}>

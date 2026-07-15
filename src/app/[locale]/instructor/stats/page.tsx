@@ -131,12 +131,12 @@ export default async function StatsPage({
         </div>
       </div>
 
-      {/* ЗП: 10% от чеков сессий + 10% от оплаченных абонементов */}
+      {/* ЗП: 15% от чеков сессий + 10% от оплаченных абонементов */}
       <div className="mt-3 rounded-2xl border-2 border-primary bg-surface p-5">
         <p className="text-sm text-muted">Моя ЗП за период</p>
         <p className="mt-1 text-3xl font-bold text-primary">{vnd(stats.salary)}</p>
         <div className="mt-3 space-y-1 text-sm text-muted">
-          <p>10% от сессий: {vnd(stats.salaryFromSessions)}</p>
+          <p>15% от сессий: {vnd(stats.salaryFromSessions)}</p>
           <p>
             10% от оплаченных абонементов ({stats.paidSubsCount} шт.):{" "}
             {vnd(stats.salaryFromSubs)}

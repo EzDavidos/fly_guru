@@ -2,11 +2,14 @@ import type { createClient } from "@/lib/supabase/server";
 
 // Общий расчёт статистики инструктора — им пользуются главный экран кабинета
 // (цифры за текущий месяц) и экран «Статистика» (произвольный период).
-// Формула ЗП (архитектура, раздел 7): 10% от чеков моих сессий + 10% от
+// Формула ЗП (архитектура, раздел 7): 15% от чеков моих сессий + 10% от
 // проданных мной абонементов, У КОТОРЫХ ЕСТЬ ОПЛАТА (paid_at не пуст).
 // Неоплаченные абонементы в ЗП не входят — показываются отдельной строкой.
+// Плюс к этому — 200 000₫ за каждый выход (смену); множитель добавится в паке
+// H, когда появится сущность смен.
 
-export const SALARY_RATE = 0.1;
+export const SESSION_RATE = 0.15; // доля инструктора с чека занятия
+export const SUBS_RATE = 0.1; // доля инструктора с оплаченного абонемента
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -112,8 +115,8 @@ export async function getInstructorStats(
   const unpaid = subRows.filter((s) => !s.paid_at);
 
   const paidSubsSum = paidInRange.reduce((s, r) => s + Number(r.price ?? 0), 0);
-  const salaryFromSessions = revenue * SALARY_RATE;
-  const salaryFromSubs = paidSubsSum * SALARY_RATE;
+  const salaryFromSessions = revenue * SESSION_RATE;
+  const salaryFromSubs = paidSubsSum * SUBS_RATE;
 
   return {
     clientsCount: byClient.size,
