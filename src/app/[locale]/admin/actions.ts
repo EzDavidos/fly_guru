@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
 import { phoneDigits, phonesMatch } from "@/lib/phone";
-import { subscriptionExpiry } from "@/lib/dates";
+import { subscriptionExpiry, vnToday } from "@/lib/dates";
 import { minutesLeft } from "@/lib/subscriptions";
 import { sendInstructorsBookingAlert } from "@/lib/telegram";
 import type { ActionState } from "../instructor/actions";
@@ -842,5 +842,46 @@ export async function deleteMaterialAction(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("materials").delete().eq("id", id);
   if (error) console.error("[admin] material delete error:", error.message);
+  revalidatePath("/", "layout");
+}
+
+// ── Расходы (пак E) ──────────────────────────────────────────────────────────
+// Ручные (дополнительные) траты школы: аренда, топливо, инвентарь, реклама…
+// Основные расходы (Marina 35%, ЗП 15%, Дэвид+Ромчик 2%) считаются на лету в
+// lib/finance и здесь не хранятся.
+export async function addExpenseAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+
+  const amount = parseVnd(formData.get("amount"));
+  if (!amount || amount <= 0) return { error: "Укажите сумму расхода." };
+
+  const dateRaw = String(formData.get("date") ?? "").trim();
+  const date = DAY_RE.test(dateRaw) ? dateRaw : vnToday();
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("expenses").insert({
+    date,
+    amount,
+    category: String(formData.get("category") ?? "").trim() || null,
+    comment: String(formData.get("comment") ?? "").trim() || null,
+    created_by: admin.id,
+  });
+  if (error) return { error: `Не удалось добавить расход: ${error.message}` };
+
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+export async function deleteExpenseAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("expenses").delete().eq("id", id);
+  if (error) console.error("[admin] expense delete error:", error.message);
   revalidatePath("/", "layout");
 }

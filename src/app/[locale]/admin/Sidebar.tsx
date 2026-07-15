@@ -27,6 +27,7 @@ const NAV: NavItem[] = [
   { href: "/admin/materials", label: "Материалы", hint: "ссылки для рекламы" },
   { href: "/admin/dashboard", label: "Статистика", hint: "месяц цифрами" },
   { href: "/admin/payroll", label: "Расчёт месяца", hint: "ЗП · агенты · CSV" },
+  { href: "/admin/expenses", label: "Расходы", hint: "марина · зп · прочее" },
   { href: "/admin/services", label: "Услуги", hint: "цены · справочник" },
   { href: "/admin/settings", label: "Настройки", hint: "имя · фото" },
 ];
