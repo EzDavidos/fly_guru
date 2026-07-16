@@ -5,9 +5,11 @@ import { getInstructorStats, type StatsRange } from "@/lib/stats";
 // Одна функция на страницу /admin/payroll и на CSV-выгрузку — цифры в файле
 // и на экране не могут разойтись.
 //
-// Инструкторы: 10% от чеков сессий + 10% от абонементов, ОПЛАЧЕННЫХ в этом
-// месяце (через getInstructorStats — те же цифры инструктор видит у себя).
+// Инструкторы: 15% чеков своих сессий + 200 000 ₫ за выход + доля абонементного
+// котла (через getInstructorStats — те же цифры инструктор видит у себя).
 // Агенты: подтверждённые в этом месяце награды (клиент дошёл до услуги).
+// Админа тут нет намеренно: он босс, а не наёмный — школа сама себе не платит.
+// Его деньги (сессия минус 35% Marina и 2% CRM) видны как прибыль в lib/finance.
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -17,8 +19,10 @@ export interface InstructorPayout {
   sessionsCount: number;
   sessionsRevenue: number;
   salaryFromSessions: number;
-  paidSubsCount: number;
-  salaryFromSubs: number;
+  shiftsCount: number;
+  salaryFromShifts: number;
+  paidSubsCount: number; // продал сам — справка, на сумму не влияет
+  salaryFromSubs: number; // доля котла
   total: number;
 }
 
@@ -40,22 +44,24 @@ export async function getMonthlyPayroll(
   supabase: Supabase,
   range: StatsRange,
 ): Promise<MonthlyPayroll> {
-  // Персонал: сессии проводят и абонементы продают инструкторы И админ.
+  // Только наёмные инструкторы: админ-босс себе ЗП не начисляет.
   const { data: staff } = await supabase
     .from("users")
     .select("id, name")
-    .in("role", ["instructor", "admin"])
+    .eq("role", "instructor")
     .order("name");
 
   const instructors: InstructorPayout[] = await Promise.all(
     (staff ?? []).map(async (u) => {
-      const s = await getInstructorStats(supabase, u.id, range);
+      const s = await getInstructorStats(supabase, u.id, range, "instructor");
       return {
         id: u.id,
         name: u.name,
         sessionsCount: s.sessionsCount,
         sessionsRevenue: s.revenue,
         salaryFromSessions: s.salaryFromSessions,
+        shiftsCount: s.shiftsCount,
+        salaryFromShifts: s.salaryFromShifts,
         paidSubsCount: s.paidSubsCount,
         salaryFromSubs: s.salaryFromSubs,
         total: s.salary,

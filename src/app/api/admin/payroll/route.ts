@@ -34,8 +34,10 @@ export async function GET(request: NextRequest) {
       "Сессии, шт",
       "Выручка сессий, VND",
       "15% сессий, VND",
-      "Оплаченные абонементы, шт",
-      "10% абонементов, VND",
+      "Выходы, шт",
+      "За выходы, VND",
+      "Продал абонементов, шт",
+      "Доля абонементов, VND",
       "Подтверждённые клиенты, шт",
       "Итого к выплате, VND",
     ],
@@ -47,6 +49,8 @@ export async function GET(request: NextRequest) {
       i.sessionsCount,
       i.sessionsRevenue,
       i.salaryFromSessions,
+      i.shiftsCount,
+      i.salaryFromShifts,
       i.paidSubsCount,
       i.salaryFromSubs,
       "",
@@ -54,9 +58,9 @@ export async function GET(request: NextRequest) {
     ]);
   }
   for (const a of payroll.agents) {
-    rows.push(["Агент", a.name, "", "", "", "", "", a.confirmedCount, a.total]);
+    rows.push(["Агент", a.name, "", "", "", "", "", "", "", a.confirmedCount, a.total]);
   }
-  rows.push(["Итого", "", "", "", "", "", "", "", payroll.grandTotal]);
+  rows.push(["Итого", "", "", "", "", "", "", "", "", "", payroll.grandTotal]);
 
   // BOM + точка с запятой — так файл сразу открывается русским Excel.
   const csv = "\uFEFF" + rows.map((r) => r.map(cell).join(";")).join("\r\n");

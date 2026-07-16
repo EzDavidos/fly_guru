@@ -23,7 +23,12 @@ export default async function InstructorLayout({
   const supabase = await createClient();
   const month = vnCurrentMonth();
   const [stats, { count }] = await Promise.all([
-    getInstructorStats(supabase, user.id, month),
+    getInstructorStats(
+      supabase,
+      user.id,
+      month,
+      user.role === "admin" ? "admin" : "instructor",
+    ),
     supabase
       .from("bookings")
       .select("id", { count: "exact", head: true })

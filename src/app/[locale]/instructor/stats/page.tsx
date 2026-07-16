@@ -8,7 +8,7 @@ import {
   vnShiftDays,
   vnToday,
 } from "@/lib/dates";
-import { getInstructorStats, vnd, type StatsRange } from "@/lib/stats";
+import { SHIFT_PAY, getInstructorStats, vnd, type StatsRange } from "@/lib/stats";
 import { setTourApprovedAction } from "../actions";
 
 // «Статистика» за произвольный период. По умолчанию — текущий месяц
@@ -55,7 +55,14 @@ export default async function StatsPage({
   const label = custom ? `${from} — ${to}` : month.label;
 
   const supabase = await createClient();
-  const stats = await getInstructorStats(supabase, user.id, range);
+  // В кабинет инструктора пускают и админа (requireRole — админ суперюзер),
+  // но ЗП у него нет: роль решает, начислять слагаемые или показать нули.
+  const stats = await getInstructorStats(
+    supabase,
+    user.id,
+    range,
+    user.role === "admin" ? "admin" : "instructor",
+  );
 
   const maxAmount = Math.max(...stats.clientBars.map((b) => b.amount), 1);
 
@@ -142,23 +149,32 @@ export default async function StatsPage({
         </div>
       </div>
 
-      {/* ЗП: 15% от чеков сессий + 10% от оплаченных абонементов */}
+      {/* ЗП: 15% сессий + 200к за выход + подушевая доля абонементного котла */}
       <div className="mt-3 rounded-2xl border-2 border-primary bg-surface p-5">
         <p className="text-sm text-muted">Моя ЗП за период</p>
         <p className="mt-1 text-3xl font-bold text-primary">{vnd(stats.salary)}</p>
         <div className="mt-3 space-y-1 text-sm text-muted">
-          <p>15% от сессий: {vnd(stats.salaryFromSessions)}</p>
+          <p>15% от моих сессий: {vnd(stats.salaryFromSessions)}</p>
           <p>
-            10% от оплаченных абонементов ({stats.paidSubsCount} шт.):{" "}
-            {vnd(stats.salaryFromSubs)}
+            Выходы ({stats.shiftsCount} × {vnd(SHIFT_PAY)}):{" "}
+            {vnd(stats.salaryFromShifts)}
+          </p>
+          <p>
+            Абонементы — 10% от продаж инструкторов ({vnd(stats.subsPool)}) поровну
+            на {stats.instructorsCount}: {vnd(stats.salaryFromSubs)}
           </p>
         </div>
+        <p className="mt-3 text-xs text-muted">
+          Абонементный котёл общий: неважно, кто из инструкторов продал — доля
+          у всех одинаковая. Сам продал {stats.paidSubsCount} шт. за период.
+        </p>
       </div>
 
       {stats.unpaidSubsCount > 0 && (
         <div className="mt-3 rounded-2xl border border-dashed border-line bg-surface p-4 text-sm text-muted">
           Ожидают оплату — в ЗП не входят: {stats.unpaidSubsCount} абонемент(а) на{" "}
-          {vnd(stats.unpaidSubsSum)}. Когда админ отметит оплату, 10% попадут в расчёт.
+          {vnd(stats.unpaidSubsSum)}. Когда админ отметит оплату, их 10% пойдут
+          в общий котёл.
         </div>
       )}
 

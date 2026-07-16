@@ -57,7 +57,13 @@ export default async function AdminPayrollPage({
       </div>
 
       <section className="mt-3 rounded-2xl border border-line bg-surface p-4">
-        <h2 className="font-bold">Инструкторы · 15% сессий + 10% абонементов</h2>
+        <h2 className="font-bold">
+          Инструкторы · 200 000 ₫ за выход + 15% сессий + доля абонементов
+        </h2>
+        <p className="mt-1 text-xs text-muted">
+          10% с абонементов, проданных инструкторами, делится между ними поровну —
+          неважно, кто продал. Ваши сессии и абонементы в расчёт не идут.
+        </p>
         <div className="mt-3 space-y-4">
           {payroll.instructors.map((i) => (
             <div key={i.id}>
@@ -71,7 +77,11 @@ export default async function AdminPayrollPage({
                   value={vnd(i.salaryFromSessions)}
                 />
                 <Row
-                  label={`Оплаченные абонементы (${i.paidSubsCount})`}
+                  label={`Выходы (${i.shiftsCount})`}
+                  value={vnd(i.salaryFromShifts)}
+                />
+                <Row
+                  label={`Доля абонементов · продал сам ${i.paidSubsCount}`}
                   value={vnd(i.salaryFromSubs)}
                 />
               </div>

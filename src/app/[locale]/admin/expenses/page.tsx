@@ -11,9 +11,9 @@ import { ExpenseForm } from "./ExpenseForm";
 export const metadata: Metadata = { title: "Админка · Расходы" };
 
 // Вкладка «Расходы» (пак E) — мини-P&L школы за месяц. Основные расходы
-// считаются из выручки на лету (Marina 35% сессий, ЗП 15% сессий + 10%
-// абонементов, Дэвид+Ромчик 2%), дополнительные — ручные из таблицы expenses.
-// Итог — чистая прибыль школы.
+// считаются из выручки на лету (Marina 35%, ЗП инструкторов, Дэвид+Ромчик 2%),
+// дополнительные — ручные из таблицы expenses. Итог — чистая прибыль, то есть
+// деньги босса: со своих сессий он платит только Marina и 2% CRM (см. lib/finance).
 
 function Row({
   label,
@@ -91,7 +91,7 @@ export default async function AdminExpensesPage({
           <Row label="Marina Beach" hint="35% выручки" value={vnd(fin.marina)} />
           <Row
             label="ЗП инструкторов"
-            hint="15% сессий + 10% абонементов"
+            hint={`15% их сессий + ${fin.instructorShifts} выходов + 10% их абонементов`}
             value={vnd(fin.instructorPay)}
           />
           <Row
