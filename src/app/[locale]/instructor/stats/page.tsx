@@ -160,7 +160,7 @@ export default async function StatsPage({
             {vnd(stats.salaryFromShifts)}
           </p>
           <p>
-            Абонементы — 10% от продаж инструкторов ({vnd(stats.subsPool)}) поровну
+            Абонементы — 15% от продаж инструкторов ({vnd(stats.subsPool)}) поровну
             на {stats.instructorsCount}: {vnd(stats.salaryFromSubs)}
           </p>
         </div>
@@ -173,7 +173,7 @@ export default async function StatsPage({
       {stats.unpaidSubsCount > 0 && (
         <div className="mt-3 rounded-2xl border border-dashed border-line bg-surface p-4 text-sm text-muted">
           Ожидают оплату — в ЗП не входят: {stats.unpaidSubsCount} абонемент(а) на{" "}
-          {vnd(stats.unpaidSubsSum)}. Когда админ отметит оплату, их 10% пойдут
+          {vnd(stats.unpaidSubsSum)}. Когда админ отметит оплату, их 15% пойдут
           в общий котёл.
         </div>
       )}

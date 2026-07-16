@@ -13,7 +13,8 @@ export default async function SubscriptionPage() {
       <h1 className="text-2xl font-bold">Продать абонемент</h1>
       <p className="mt-1 text-sm text-muted">
         {sub.durationMin} минут за {formatVnd(sub.price)}. Минуты действуют 3 месяца.
-        Продажа записывается на вас — 10% с оплаченного абонемента ваши.
+        После оплаты 15% идут в общий котёл и делятся поровну между всеми
+        инструкторами — неважно, кто продал.
       </p>
       <div className="mt-6">
         <SubscriptionForm />

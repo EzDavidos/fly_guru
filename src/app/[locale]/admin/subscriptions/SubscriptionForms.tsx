@@ -68,7 +68,7 @@ export function SellSubscriptionForm({
 
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-muted">
-          Продал (комиссия 10% после оплаты)
+          Продал (15% в общий котёл после оплаты)
           <select name="sellerId" className={`mt-1 ${inputClass}`}>
             {staff.map((u) => (
               <option key={u.id} value={u.id}>
