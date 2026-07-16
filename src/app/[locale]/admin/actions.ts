@@ -8,6 +8,7 @@ import { phoneDigits, phonesMatch } from "@/lib/phone";
 import { subscriptionExpiry, vnToday } from "@/lib/dates";
 import { minutesLeft } from "@/lib/subscriptions";
 import { sendInstructorsBookingAlert } from "@/lib/telegram";
+import { MANUAL_CHANNELS } from "@/lib/channels";
 import type { ActionState } from "../instructor/actions";
 
 // Server actions админки: полный цикл заявки. Админ созванивается с гостем,
@@ -80,6 +81,55 @@ async function confirmPendingReward(id: string) {
     .eq("client_id", b.client_id)
     .eq("status", "pending");
   if (error) console.error("[admin] reward confirm error:", error.message);
+}
+
+// Ручная заявка: клиент позвонил / написал / пришёл ногами. Без неё такой
+// клиент не попадал в CRM вообще — заявки умела создавать только форма сайта,
+// а значит календарь и «Записи» инструктора не видели половину потока.
+// По умолчанию сразу «Подтверждена»: админ уже договорился о дате голосом,
+// второй шаг «Подтвердить» тут лишний. Тогда же уходит уведомление в телегу.
+export async function createBookingAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const clientName = String(formData.get("clientName") ?? "").trim();
+  if (!clientName) return { error: "Укажите имя клиента." };
+  const phone = String(formData.get("phone") ?? "").trim();
+  if (!phone) return { error: "Укажите телефон клиента." };
+
+  const channel = String(formData.get("channel") ?? "").trim();
+  if (!MANUAL_CHANNELS[channel]) return { error: "Выберите, откуда пришёл клиент." };
+
+  const preferredDate = String(formData.get("preferredDate") ?? "").trim();
+  if (preferredDate && !DAY_RE.test(preferredDate))
+    return { error: "Дата — в формате ГГГГ-ММ-ДД." };
+
+  const serviceId = String(formData.get("serviceId") ?? "");
+  const confirmed = formData.get("status") !== "new";
+
+  const supabase = await createClient();
+  const { data: created, error } = await supabase
+    .from("bookings")
+    .insert({
+      client_name: clientName,
+      phone,
+      service_id: serviceId || null,
+      preferred_date: preferredDate || null,
+      status: confirmed ? "confirmed" : "new",
+      src: channel,
+      ...bookingFields(formData),
+    })
+    .select("id")
+    .single();
+  if (error) return { error: `Не удалось создать заявку: ${error.message}` };
+
+  // Инструкторам сообщаем только о том, что уже подтверждено — как и с сайта.
+  if (confirmed) await notifyInstructors(created.id as string).catch(() => {});
+
+  revalidatePath("/", "layout");
+  redirect("/admin/bookings");
 }
 
 // «Подтвердить»: сохранить данные созвона и опубликовать запись инструкторам.

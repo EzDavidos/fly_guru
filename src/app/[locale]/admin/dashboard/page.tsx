@@ -9,6 +9,7 @@ import {
   vnToday,
 } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
+import { MANUAL_CHANNELS } from "@/lib/channels";
 
 export const metadata: Metadata = { title: "Админка · Статистика" };
 
@@ -282,7 +283,13 @@ export default async function AdminDashboardPage({
   let lostSum = 0;
   for (const b of bookings) {
     byStatus.set(b.status, (byStatus.get(b.status) ?? 0) + 1);
-    const source = b.ref_code ? "по реф-ссылке" : b.src ? `src: ${b.src}` : "прямые";
+    // Ручные каналы (звонок/мессенджер/пришёл сам) показываем по-человечески,
+    // сайтовые метки — как есть: «src: instagram».
+    const source = b.ref_code
+      ? "по реф-ссылке"
+      : b.src
+        ? (MANUAL_CHANNELS[b.src] ?? `src: ${b.src}`)
+        : "прямые";
     bySource.set(source, (bySource.get(source) ?? 0) + 1);
     if (b.status === "cancelled") lostSum += b.service?.price ?? 0;
   }

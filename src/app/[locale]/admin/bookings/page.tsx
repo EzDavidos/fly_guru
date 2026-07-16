@@ -9,6 +9,8 @@ import {
   setStatusAction,
   rescheduleAction,
 } from "../actions";
+import { MANUAL_CHANNELS } from "@/lib/channels";
+import { BookingCreateForm } from "./BookingCreateForm";
 
 export const metadata: Metadata = { title: "Админка · Заявки" };
 
@@ -143,7 +145,7 @@ function BookingCard({
         {/* Атрибуция: откуда пришёл клиент */}
         {(b.src || b.ref_code || utmEntries.length > 0) && (
           <div className="mt-2 space-y-0.5 rounded-xl bg-line/30 px-3 py-2 text-xs text-muted">
-            {b.src && <p>Источник: {b.src}</p>}
+            {b.src && <p>Источник: {MANUAL_CHANNELS[b.src] ?? b.src}</p>}
             {b.ref_code && <p>Реф-код: {b.ref_code} (скидка 200 000 ₫ на базовое)</p>}
             {utmEntries.map(([k, v]) => (
               <p key={k}>
@@ -314,6 +316,20 @@ export default async function AdminBookingsPage({
   const supabase = await createClient();
   const today = vnToday();
 
+  // Услуги для формы ручной заявки. Абонемент отсюда исключён намеренно: его
+  // продают через /admin/subscriptions, иначе продажа пройдёт мимо минут
+  // и membership (та же дыра, что чинили в 4.8).
+  const { data: serviceRows } = await supabase
+    .from("services")
+    .select("id, name, category")
+    .eq("active", true)
+    .neq("category", "subscription")
+    .order("name");
+  const services = (serviceRows ?? []).map((s) => ({
+    id: s.id as string,
+    name: s.name as string,
+  }));
+
   const { data } = await supabase
     .from("bookings")
     .select(
@@ -373,8 +389,13 @@ export default async function AdminBookingsPage({
       </h1>
       <p className="mt-1 text-sm text-muted">
         Тап по заявке раскрывает карточку. Созвонились → внесите время, возраст,
-        вес → «Подтвердить»: запись увидят инструкторы.
+        вес → «Подтвердить»: запись увидят инструкторы. Позвонили или написали
+        напрямую — заведите заявку сами кнопкой ниже.
       </p>
+
+      <div className="mt-4">
+        <BookingCreateForm services={services} today={today} />
+      </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
         {FILTERS.map((f) => (
