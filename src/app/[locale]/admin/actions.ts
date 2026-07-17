@@ -166,10 +166,17 @@ export async function setStatusAction(status: string, formData: FormData) {
 
 // ── Сессии (подэтап 4.2) ─────────────────────────────────────────────────────
 // Сумма и дата в форме — как их вводит человек: «1 500 000», «1.500.000».
+// Точка и запятая — ТОЛЬКО разделитель тысяч, поэтому требуем группы ровно по
+// три цифры. Раньше разделители выкидывались без разбора, и «1.5» (в смысле
+// «полтора миллиона») молча становилось чеком в 15 ₫ — без единой ошибки на
+// экране. В донгах дробей не бывает: не угадываем, а возвращаем null, и
+// вызывающий показывает «Сумма — число в донгах».
 function parseVnd(raw: FormDataEntryValue | null): number | null {
-  const s = String(raw ?? "").replace(/[\s.,]/g, "");
-  if (!s || !/^\d+$/.test(s)) return null;
-  return Number(s);
+  const s = String(raw ?? "").replace(/\s/g, "");
+  if (!s) return null;
+  if (/^\d+$/.test(s)) return Number(s);
+  if (/^\d{1,3}([.,]\d{3})+$/.test(s)) return Number(s.replace(/[.,]/g, ""));
+  return null;
 }
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
