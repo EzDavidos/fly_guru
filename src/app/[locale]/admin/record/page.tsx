@@ -36,20 +36,27 @@ export default async function AdminRecordPage({
   }));
   const staff = staffRes.data ?? [];
 
+  const today = vnToday();
+
   let prefill: RecordPrefill | undefined;
   if (bookingId) {
     const { data: booking } = await supabase
       .from("bookings")
-      .select("id, client_name, phone, service_id, ref_code")
+      .select("id, client_name, phone, service_id, ref_code, preferred_date")
       .eq("id", bookingId)
       .maybeSingle();
     if (booking) {
+      // Дату занятия берём из заявки: админ уже договорился с клиентом на этот
+      // день, и запись должна лечь именно туда, а не на «сегодня». Будущую дату
+      // не подставляем — занятие ещё не состоялось, а поле не пускает вперёд.
+      const day = booking.preferred_date as string | null;
       prefill = {
         bookingId: booking.id,
         name: booking.client_name,
         phone: booking.phone,
         serviceId: booking.service_id ?? undefined,
         refCode: booking.ref_code,
+        date: day && day <= today ? day : today,
       };
     }
   }
@@ -65,7 +72,7 @@ export default async function AdminRecordPage({
         <RecordClientForm
           services={services}
           staff={staff}
-          today={vnToday()}
+          today={today}
           defaultInstructorId={admin?.id ?? staff[0]?.id ?? ""}
           prefill={prefill}
         />

@@ -22,6 +22,7 @@ export interface RecordPrefill {
   phone?: string;
   serviceId?: string;
   refCode?: string | null;
+  date?: string; // дата из заявки — на неё и ляжет занятие
 }
 
 const inputClass =
@@ -67,7 +68,7 @@ export function RecordClientForm({
           <input
             type="date"
             name="date"
-            defaultValue={today}
+            defaultValue={prefill?.date ?? today}
             max={today}
             required
             className={`mt-1 ${inputClass}`}
