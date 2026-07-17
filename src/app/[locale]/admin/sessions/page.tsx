@@ -80,12 +80,16 @@ function SessionCard({
           </label>
           <label className="text-xs text-muted">
             Инструктор
+            {/* Пустое значение = «не трогать поле» (см. updateSessionAction).
+                Подпись честно об этом говорит: раньше тут было «—», и выбор
+                читался как «убрать инструктора», хотя сохранение его молча
+                игнорировало. */}
             <select
               name="instructorId"
               defaultValue={s.instructor_id ?? ""}
               className={`mt-1 ${inputClass}`}
             >
-              <option value="">—</option>
+              <option value="">— не менять</option>
               {staff.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
@@ -102,7 +106,7 @@ function SessionCard({
                   defaultValue={s.service_id ?? ""}
                   className={`mt-1 ${inputClass}`}
                 >
-                  <option value="">—</option>
+                  <option value="">— не менять</option>
                   {services.map((sv) => (
                     <option key={sv.id} value={sv.id}>
                       {sv.name}
