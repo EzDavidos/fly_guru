@@ -141,10 +141,17 @@ export async function recordClientAction(
   if (bookingId) {
     const { data: booking } = await supabase
       .from("bookings")
-      .select("id, ref_code")
+      .select("id, status, ref_code")
       .eq("id", bookingId)
       .maybeSingle();
-    refCode = booking?.ref_code ?? null;
+    if (!booking) return { error: "Заявка не найдена." };
+    // Уже оформленную заявку вторично не проводим: повторный сабмит (кнопка
+    // «Назад», зависшая вкладка) записывал второе занятие и вторую награду
+    // агенту — чек задваивался в выручке и в ЗП.
+    if (booking.status === "done") {
+      return { error: "Эта заявка уже оформлена — занятие записано." };
+    }
+    refCode = booking.ref_code ?? null;
   }
 
   // Резолвим реф-код → агент. Коды членов клуба появятся на этапе 5 —

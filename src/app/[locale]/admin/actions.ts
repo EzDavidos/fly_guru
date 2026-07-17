@@ -204,10 +204,17 @@ function dayToIso(day: string): string {
 // Клиент из формы: существующий (select clientId) ИЛИ новый по имени+телефону.
 // Перед созданием ищем по телефону — та же логика гибкого сравнения цифр,
 // что у инструктора, чтобы не плодить дублей из-за «+84» против «84».
+//
+// createdAt — момент, которым клиент появился у школы: дата занятия (или
+// продажи абонемента), а НЕ «сейчас». При записи задним числом (перенос старой
+// CRM, забытое занятие) клиент иначе считался бы новым в текущем месяце, и
+// «Новых клиентов» на Статистике показывало бы всех перенесённых разом.
+// В обычной работе дата занятия и есть сегодня — поведение не меняется.
 async function resolveClient(
   supabase: Awaited<ReturnType<typeof createClient>>,
   adminId: string,
   formData: FormData,
+  createdAt: string,
 ): Promise<{ id: string } | { error: string }> {
   const clientId = String(formData.get("clientId") ?? "");
   if (clientId) return { id: clientId };
@@ -233,6 +240,7 @@ async function resolveClient(
       city: String(formData.get("newCity") ?? "").trim() || null,
       source: "offline",
       created_by: adminId,
+      created_at: createdAt,
     })
     .select("id")
     .single();
@@ -267,9 +275,38 @@ export async function createSessionAction(
     return { error: "Выберите услугу и инструктора." };
   }
 
-  const clientRes = await resolveClient(supabase, admin.id, formData);
-  if ("error" in clientRes) return clientRes;
-  const clientId = clientRes.id;
+  // Если запись закрывает заявку (админская «Запись клиента» из ?booking=id) —
+  // тянем её реф-код и, если это активный агент, готовим скидку и награду, как
+  // в кабинете инструктора. Форма сессий bookingId не шлёт — для неё блок no-op.
+  //
+  // Проверяем ДО создания клиента: иначе отказ ниже оставил бы клиента-сироту.
+  const bookingId = String(formData.get("bookingId") ?? "") || null;
+  let agent: { id: string; commission_fixed: number } | null = null;
+  if (bookingId) {
+    const { data: booking } = await supabase
+      .from("bookings")
+      .select("status, ref_code")
+      .eq("id", bookingId)
+      .maybeSingle();
+    if (!booking) return { error: "Заявка не найдена." };
+    // Уже проведённую заявку вторично не оформляем: кнопка «Назад», повторный
+    // сабмит или забытая вкладка со старым ?booking=id записывали ВТОРОЕ
+    // занятие и ВТОРУЮ награду агенту — чек задваивался в выручке и ЗП.
+    if (booking.status === "done") {
+      return {
+        error: "Эта заявка уже проведена — занятие записано. Смотрите вкладку «Сессии».",
+      };
+    }
+    if (booking.ref_code) {
+      const { data } = await supabase
+        .from("agents")
+        .select("id, commission_fixed")
+        .eq("ref_code", booking.ref_code)
+        .eq("active", true)
+        .maybeSingle();
+      agent = data ?? null;
+    }
+  }
 
   const { data: service } = await supabase
     .from("services")
@@ -283,27 +320,11 @@ export async function createSessionAction(
     return { error: "Абонемент оформляется на вкладке «Абонементы»." };
   }
 
-  // Если запись закрывает заявку (админская «Запись клиента» из ?booking=id) —
-  // тянем её реф-код и, если это активный агент, готовим скидку и награду, как
-  // в кабинете инструктора. Форма сессий bookingId не шлёт — для неё блок no-op.
-  const bookingId = String(formData.get("bookingId") ?? "") || null;
-  let agent: { id: string; commission_fixed: number } | null = null;
-  if (bookingId) {
-    const { data: booking } = await supabase
-      .from("bookings")
-      .select("ref_code")
-      .eq("id", bookingId)
-      .maybeSingle();
-    if (booking?.ref_code) {
-      const { data } = await supabase
-        .from("agents")
-        .select("id, commission_fixed")
-        .eq("ref_code", booking.ref_code)
-        .eq("active", true)
-        .maybeSingle();
-      agent = data ?? null;
-    }
-  }
+  // Клиент — последним из проверок: всё, что могло отказать, уже отказало.
+  // created_at = дате занятия (см. resolveClient).
+  const clientRes = await resolveClient(supabase, admin.id, formData, dayToIso(date));
+  if ("error" in clientRes) return clientRes;
+  const clientId = clientRes.id;
 
   // Пустая сумма = по прайсу (с агентской скидкой −200к на базовое обучение);
   // введённая вручную — важнее (админ решает: скидки, брони, доплаты).
@@ -453,7 +474,9 @@ export async function adminSellSubscriptionAction(
   const price = priceRaw ? parseVnd(priceRaw) : 6_000_000;
   if (price === null) return { error: "Цена — число в донгах, например 6 000 000." };
 
-  const clientRes = await resolveClient(supabase, admin.id, formData);
+  // created_at клиента = дате продажи: абонемент, проданный задним числом, не
+  // должен делать клиента «новым в этом месяце» (см. resolveClient).
+  const clientRes = await resolveClient(supabase, admin.id, formData, soldAt);
   if ("error" in clientRes) return clientRes;
   const clientId = clientRes.id;
 
