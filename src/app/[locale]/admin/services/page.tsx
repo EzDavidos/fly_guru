@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { vnd } from "@/lib/stats";
 import { CATEGORY_LABELS, type ServiceCategory } from "@/content/services";
 import { toggleServiceActiveAction, updateServiceAction } from "../actions";
+import { SaveForm } from "../SaveForm";
 import { ServiceCreateForm } from "./ServiceCreateForm";
 
 export const metadata: Metadata = { title: "Админка · Услуги" };
@@ -45,7 +46,7 @@ function ServiceCard({ s }: { s: ServiceRow }) {
       </summary>
 
       <div className="space-y-3 border-t border-line/70 p-4 pt-3">
-        <form action={updateServiceAction} className="space-y-2">
+        <SaveForm action={updateServiceAction} className="space-y-2">
           <input type="hidden" name="id" value={s.id} />
           <label className="block text-xs text-muted">
             Название
@@ -87,7 +88,7 @@ function ServiceCard({ s }: { s: ServiceRow }) {
           >
             Сохранить
           </button>
-        </form>
+        </SaveForm>
 
         <form action={toggleServiceActiveAction}>
           <input type="hidden" name="id" value={s.id} />

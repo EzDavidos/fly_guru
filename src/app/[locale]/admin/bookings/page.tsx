@@ -10,6 +10,7 @@ import {
   rescheduleAction,
 } from "../actions";
 import { MANUAL_CHANNELS } from "@/lib/channels";
+import { SaveForm } from "../SaveForm";
 import { BookingCreateForm } from "./BookingCreateForm";
 
 export const metadata: Metadata = { title: "Админка · Заявки" };
@@ -155,8 +156,13 @@ function BookingCard({
           </div>
         )}
 
-        {/* Поля созвона + основные действия */}
-        <form action={b.status === "new" ? confirmBookingAction : saveBookingAction} className="mt-3">
+        {/* Поля созвона + основные действия. Кнопки статусов ниже идут через
+            свой formAction — мимо SaveForm: у них обратная связь своя, меняется
+            бейдж карточки. SaveForm подтверждает именно «Сохранить». */}
+        <SaveForm
+          action={b.status === "new" ? confirmBookingAction : saveBookingAction}
+          className="mt-3"
+        >
           <input type="hidden" name="id" value={b.id} />
           <input type="hidden" name="pinned" value={b.pinned ? "1" : "0"} />
 
@@ -266,7 +272,7 @@ function BookingCard({
               </button>
             )}
           </div>
-        </form>
+        </SaveForm>
 
         {/* Перенос: новая дата/время, статус остаётся живым */}
         {!terminal && (

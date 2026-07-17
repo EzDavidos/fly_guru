@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { phoneDigits } from "@/lib/phone";
 import { vnd } from "@/lib/stats";
 import { updateClientAction } from "../actions";
+import { SaveForm } from "../SaveForm";
 
 export const metadata: Metadata = { title: "Админка · Клиенты" };
 
@@ -120,7 +121,7 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
           </p>
         </div>
 
-        <form action={updateClientAction} className="mt-3">
+        <SaveForm action={updateClientAction} className="mt-3">
           <input type="hidden" name="id" value={c.id} />
           <div className="grid grid-cols-2 gap-2">
             <label className="text-xs text-muted">
@@ -191,7 +192,7 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
           >
             Сохранить
           </button>
-        </form>
+        </SaveForm>
       </div>
     </details>
   );

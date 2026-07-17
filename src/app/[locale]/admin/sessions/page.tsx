@@ -4,6 +4,7 @@ import { vnCurrentMonth, vnPeriod, vnToday } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
 import { deleteSessionAction, updateSessionAction } from "../actions";
 import { ConfirmSubmit } from "../ConfirmSubmit";
+import { SaveForm } from "../SaveForm";
 import { SessionCreateForm } from "./SessionCreateForm";
 
 export const metadata: Metadata = { title: "Админка · Сессии" };
@@ -66,7 +67,7 @@ function SessionCard({
         <span className="text-muted transition-transform group-open:rotate-180">▾</span>
       </summary>
 
-      <form action={updateSessionAction} className="border-t border-line/70 p-4 pt-3">
+      <SaveForm action={updateSessionAction} className="border-t border-line/70 p-4 pt-3">
         <input type="hidden" name="id" value={s.id} />
         <div className="grid grid-cols-2 gap-2">
           <label className="text-xs text-muted">
@@ -139,7 +140,7 @@ function SessionCard({
         >
           Сохранить
         </button>
-      </form>
+      </SaveForm>
 
       <form action={deleteSessionAction} className="border-t border-line/70 p-4 pt-3">
         <input type="hidden" name="id" value={s.id} />
