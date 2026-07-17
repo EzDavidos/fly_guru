@@ -37,12 +37,24 @@ function bookingFields(formData: FormData) {
   };
 }
 
+// Провалившаяся запись не должна выглядеть как успешная. Кидаем ошибку — её
+// поймает admin/error.tsx и честно скажет «не сохранилось»; настоящая причина
+// уходит в серверный лог. Раньше сбой видел только лог: страница
+// перерисовывалась прежней, и человек продолжал заполнять CRM, думая, что всё
+// записалось. Формы, которые умеют показывать текст ошибки под кнопкой
+// (useActionState), сюда не ходят — они возвращают { error } как и раньше.
+function failIfError(error: { message: string } | null, what: string): void {
+  if (!error) return;
+  console.error(`[admin] ${what}:`, error.message);
+  throw new Error(`${what}: ${error.message}`);
+}
+
 // Обновить заявку и перерисовать всё, где висят счётчики (админка, кабинет,
 // бейдж в шапке) — на масштабе школы дешевле, чем целиться в пути.
 async function updateBooking(id: string, patch: Record<string, unknown>) {
   const supabase = await createClient();
   const { error } = await supabase.from("bookings").update(patch).eq("id", id);
-  if (error) console.error("[admin] booking update error:", error.message);
+  failIfError(error, "не удалось сохранить заявку");
   revalidatePath("/", "layout");
 }
 
@@ -80,7 +92,9 @@ async function confirmPendingReward(id: string) {
     .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
     .eq("client_id", b.client_id)
     .eq("status", "pending");
-  if (error) console.error("[admin] reward confirm error:", error.message);
+  // Кидаем до смены статуса заявки: либо награда подтверждена и заявка
+  // «выполнена», либо не поменялось ничего — полумеры тут хуже ошибки.
+  failIfError(error, "не удалось подтвердить награду агента");
 }
 
 // Ручная заявка: клиент позвонил / написал / пришёл ногами. Без неё такой
@@ -325,6 +339,9 @@ export async function createSessionAction(
       reward_type: "money",
       amount: agent.commission_fixed,
     });
+    // Не кидаем: сессия уже записана. Ошибка «не сохранилось» толкнула бы
+    // админа оформить занятие второй раз — получили бы дубль чека в выручке.
+    // Награду в крайнем случае восстановит админ, дубль денег — нет.
     if (rewardError) console.error("[admin] reward insert error:", rewardError.message);
   }
   if (bookingId) {
@@ -367,7 +384,7 @@ export async function updateSessionAction(formData: FormData) {
   }
   if (Object.keys(patch).length === 0) return;
   const { error } = await supabase.from("sessions").update(patch).eq("id", id);
-  if (error) console.error("[admin] session update error:", error.message);
+  failIfError(error, "не удалось сохранить сессию");
   revalidatePath("/", "layout");
 }
 
@@ -386,10 +403,7 @@ export async function deleteSessionAction(formData: FormData) {
     .eq("id", id)
     .maybeSingle();
   const { error } = await supabase.from("sessions").delete().eq("id", id);
-  if (error) {
-    console.error("[admin] session delete error:", error.message);
-    return;
-  }
+  failIfError(error, "не удалось удалить сессию");
   if (s?.subscription_id) {
     await recalcSubscriptionStatus(supabase, s.subscription_id);
   }
@@ -466,6 +480,9 @@ export async function adminSellSubscriptionAction(
     const { error: memError } = await supabase
       .from("memberships")
       .insert({ client_id: clientId });
+    // Не кидаем по той же причине, что и с наградой выше: абонемент уже продан,
+    // а повтор формы создал бы второй на того же клиента. Членство добавляется
+    // руками на вкладке «Члены клуба».
     if (memError) console.error("[admin] membership insert error:", memError.message);
   }
 
@@ -491,7 +508,7 @@ export async function togglePaidAction(formData: FormData) {
     .from("subscriptions")
     .update({ paid_at: paidAt })
     .eq("id", id);
-  if (error) console.error("[admin] paid toggle error:", error.message);
+  failIfError(error, "не удалось изменить отметку оплаты");
   revalidatePath("/", "layout");
 }
 
@@ -540,12 +557,9 @@ export async function deleteSubscriptionAction(formData: FormData) {
     .from("sessions")
     .delete()
     .eq("subscription_id", id);
-  if (sessionsError) {
-    console.error("[admin] subscription writeoffs delete error:", sessionsError.message);
-    return;
-  }
+  failIfError(sessionsError, "не удалось удалить списания абонемента");
   const { error } = await supabase.from("subscriptions").delete().eq("id", id);
-  if (error) console.error("[admin] subscription delete error:", error.message);
+  failIfError(error, "не удалось удалить абонемент");
   revalidatePath("/", "layout");
 }
 
@@ -573,7 +587,7 @@ export async function updateClientAction(formData: FormData) {
       tour_approved: formData.get("tour_approved") === "1",
     })
     .eq("id", id);
-  if (error) console.error("[admin] client update error:", error.message);
+  failIfError(error, "не удалось сохранить карточку клиента");
   revalidatePath("/", "layout");
 }
 
@@ -653,7 +667,7 @@ export async function toggleAgentActiveAction(formData: FormData) {
     .from("agents")
     .update({ active: formData.get("active") !== "1" })
     .eq("id", id);
-  if (error) console.error("[admin] agent toggle error:", error.message);
+  failIfError(error, "не удалось переключить агента");
   revalidatePath("/", "layout");
 }
 
@@ -685,7 +699,7 @@ export async function createInviteAction(formData: FormData) {
     client_id: clientId,
     created_by: admin.id,
   });
-  if (error) console.error("[admin] invite create error:", error.message);
+  failIfError(error, "не удалось создать инвайт-ссылку");
   revalidatePath("/", "layout");
 }
 
@@ -706,7 +720,7 @@ export async function addMemberAction(formData: FormData) {
   if (existing) return;
 
   const { error } = await supabase.from("memberships").insert({ client_id: clientId });
-  if (error) console.error("[admin] membership insert error:", error.message);
+  failIfError(error, "не удалось добавить члена клуба");
   revalidatePath("/", "layout");
 }
 
@@ -780,7 +794,7 @@ export async function updateServiceAction(formData: FormData) {
       duration_min: intOrNull(formData.get("duration")),
     })
     .eq("id", id);
-  if (error) console.error("[admin] service update error:", error.message);
+  failIfError(error, "не удалось сохранить услугу");
   revalidatePath("/", "layout");
 }
 
@@ -795,7 +809,7 @@ export async function toggleServiceActiveAction(formData: FormData) {
     .from("services")
     .update({ active: formData.get("active") !== "1" })
     .eq("id", id);
-  if (error) console.error("[admin] service toggle error:", error.message);
+  failIfError(error, "не удалось переключить услугу");
   revalidatePath("/", "layout");
 }
 
@@ -901,7 +915,7 @@ export async function deleteMaterialAction(formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.from("materials").delete().eq("id", id);
-  if (error) console.error("[admin] material delete error:", error.message);
+  failIfError(error, "не удалось удалить канал");
   revalidatePath("/", "layout");
 }
 
@@ -942,7 +956,7 @@ export async function deleteExpenseAction(formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.from("expenses").delete().eq("id", id);
-  if (error) console.error("[admin] expense delete error:", error.message);
+  failIfError(error, "не удалось удалить расход");
   revalidatePath("/", "layout");
 }
 
@@ -963,9 +977,7 @@ export async function assignShiftAction(formData: FormData) {
     created_by: admin.id,
   });
   // 23505 = смена уже стоит, это не ошибка (гонка/повторный клик).
-  if (error && error.code !== "23505") {
-    console.error("[admin] shift assign error:", error.message);
-  }
+  if (error?.code !== "23505") failIfError(error, "не удалось поставить смену");
   revalidatePath("/", "layout");
 }
 
@@ -981,6 +993,6 @@ export async function removeShiftAction(formData: FormData) {
     .delete()
     .eq("instructor_id", instructorId)
     .eq("date", date);
-  if (error) console.error("[admin] shift remove error:", error.message);
+  failIfError(error, "не удалось убрать смену");
   revalidatePath("/", "layout");
 }
