@@ -1,6 +1,7 @@
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { phoneDigits } from "@/lib/phone";
+import { minutesLeft } from "@/lib/subscriptions";
 import { WriteOffForm } from "./WriteOffForm";
 
 // Списание минут: поиск клиента → остаток крупно → внести каталку.
@@ -50,14 +51,10 @@ export default async function WriteOffPage({
       .limit(1)
       .maybeSingle();
 
-    let left: number | null = null;
-    if (sub) {
-      const { data: used } = await supabase
-        .from("sessions")
-        .select("minutes_used")
-        .eq("subscription_id", sub.id);
-      left = sub.total_minutes - (used ?? []).reduce((s, r) => s + (r.minutes_used ?? 0), 0);
-    }
+    // Остаток считаем ровно тем же способом, что и writeOffAction при списании:
+    // всего + корректировки админа − списания. Свой подсчёт здесь забывал про
+    // корректировки, и экран показывал не ту цифру, которую примет сервер.
+    const left = sub ? await minutesLeft(supabase, sub) : null;
 
     return (
       <div>
