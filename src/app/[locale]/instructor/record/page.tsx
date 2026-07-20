@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
 import { vnToday } from "@/lib/dates";
+import { getActiveDict } from "@/lib/dictionaries";
 import { CopyLink } from "@/app/[locale]/admin/CopyLink";
 import { RecordForm, type RecordPrefill } from "./RecordForm";
 import { createMyRefCodeAction } from "../actions";
@@ -40,6 +41,8 @@ export default async function RecordPage({
     .eq("active", true)
     .neq("category", "subscription")
     .order("price", { ascending: true, nullsFirst: false });
+
+  const paymentMethods = await getActiveDict(supabase, "payment_methods");
 
   let prefill: RecordPrefill | undefined;
   if (bookingId) {
@@ -92,7 +95,12 @@ export default async function RecordPage({
       )}
 
       <div className="mt-6">
-        <RecordForm services={services ?? []} today={vnToday()} prefill={prefill} />
+        <RecordForm
+          services={services ?? []}
+          today={vnToday()}
+          paymentMethods={paymentMethods}
+          prefill={prefill}
+        />
       </div>
     </div>
   );

@@ -27,11 +27,13 @@ export function SessionCreateForm({
   services,
   staff,
   today,
+  paymentMethods,
 }: {
   clients: ClientOption[];
   services: ServiceOption[];
   staff: Option[];
   today: string;
+  paymentMethods: Option[];
 }) {
   const [state, formAction, pending] = useActionState(createSessionAction, {
     error: null,
@@ -66,6 +68,27 @@ export function SessionCreateForm({
           </select>
         </label>
       </div>
+
+      {/* Формат оплаты (пак A, пункт 6) — обязателен. Пустого варианта нет:
+          иначе он молча стал бы значением по умолчанию. */}
+      <label className="block text-xs text-muted">
+        Формат оплаты
+        <select
+          name="paymentMethodId"
+          required
+          defaultValue=""
+          className={`mt-1 ${inputClass}`}
+        >
+          <option value="" disabled>
+            Выберите…
+          </option>
+          {paymentMethods.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="block text-xs text-muted">
         Клиент

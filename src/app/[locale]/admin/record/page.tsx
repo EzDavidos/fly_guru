@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
 import { vnToday } from "@/lib/dates";
+import { getActiveDict } from "@/lib/dictionaries";
 import { RecordClientForm, type RecordPrefill } from "./RecordClientForm";
 
 export const metadata: Metadata = { title: "Админка · Запись клиента" };
@@ -19,6 +20,7 @@ export default async function AdminRecordPage({
   const { booking: bookingId } = await searchParams;
   const supabase = await createClient();
   const admin = await getAppUser();
+  const paymentMethods = await getActiveDict(supabase, "payment_methods");
 
   const [servicesRes, staffRes] = await Promise.all([
     // Без subscription: абонемент — не сессия (своя форма с минутами/членством).
@@ -74,6 +76,7 @@ export default async function AdminRecordPage({
           staff={staff}
           today={today}
           defaultInstructorId={admin?.id ?? staff[0]?.id ?? ""}
+          paymentMethods={paymentMethods}
           prefill={prefill}
         />
       </div>

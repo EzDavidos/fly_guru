@@ -5,6 +5,7 @@ import { vnd } from "@/lib/stats";
 import { deleteSessionAction, updateSessionAction } from "../actions";
 import { ConfirmSubmit } from "../ConfirmSubmit";
 import { SaveForm } from "../SaveForm";
+import { getActiveDict } from "@/lib/dictionaries";
 import { SessionCreateForm } from "./SessionCreateForm";
 
 export const metadata: Metadata = { title: "Админка · Сессии" };
@@ -176,6 +177,7 @@ export default async function AdminSessionsPage({
   const range = vnPeriod(fromDay, toInclusive);
 
   const supabase = await createClient();
+  const paymentMethods = await getActiveDict(supabase, "payment_methods");
   const [sessionsRes, clientsRes, servicesRes, staffRes] = await Promise.all([
     supabase
       .from("sessions")
@@ -228,6 +230,7 @@ export default async function AdminSessionsPage({
             services={services}
             staff={staff}
             today={today}
+            paymentMethods={paymentMethods}
           />
         </div>
       </details>

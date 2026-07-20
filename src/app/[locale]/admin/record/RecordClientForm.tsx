@@ -33,12 +33,14 @@ export function RecordClientForm({
   staff,
   today,
   defaultInstructorId,
+  paymentMethods,
   prefill,
 }: {
   services: ServiceOption[];
   staff: Option[];
   today: string;
   defaultInstructorId: string;
+  paymentMethods: Option[];
   prefill?: RecordPrefill;
 }) {
   const [state, formAction, pending] = useActionState(createSessionAction, {
@@ -112,6 +114,27 @@ export function RecordClientForm({
           />
         </label>
       </div>
+
+      {/* Формат оплаты (пак A, пункт 6) — обязателен, как и в форме сессий:
+          обе формы постят в один createSessionAction. */}
+      <label className="block text-xs text-muted">
+        Формат оплаты *
+        <select
+          name="paymentMethodId"
+          required
+          defaultValue=""
+          className={`mt-1 ${inputClass}`}
+        >
+          <option value="" disabled>
+            Выберите…
+          </option>
+          {paymentMethods.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="block text-xs text-muted">
         Город

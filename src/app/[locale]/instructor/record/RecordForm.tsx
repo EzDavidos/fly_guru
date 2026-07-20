@@ -17,10 +17,16 @@ export interface RecordPrefill {
 interface RecordFormProps {
   services: { id: string; name: string }[];
   today: string; // 'YYYY-MM-DD' по Вьетнаму — с сервера, чтобы не зависеть от часов телефона
+  paymentMethods: { id: string; name: string }[];
   prefill?: RecordPrefill;
 }
 
-export function RecordForm({ services, today, prefill }: RecordFormProps) {
+export function RecordForm({
+  services,
+  today,
+  paymentMethods,
+  prefill,
+}: RecordFormProps) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     recordClientAction,
     { error: null },
@@ -96,6 +102,31 @@ export function RecordForm({ services, today, prefill }: RecordFormProps) {
           {services.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Формат оплаты (пак A, пункт 6) — обязателен: занятие уже проведено и
+          оплачено, так что «чем платили» известно всегда. Пустого варианта в
+          списке нет намеренно, иначе он стал бы значением по умолчанию. */}
+      <div>
+        <label htmlFor="paymentMethodId" className="mb-1 block text-sm font-medium">
+          Формат оплаты *
+        </label>
+        <select
+          id="paymentMethodId"
+          name="paymentMethodId"
+          required
+          defaultValue=""
+          className={inputClass}
+        >
+          <option value="" disabled>
+            Выберите…
+          </option>
+          {paymentMethods.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
             </option>
           ))}
         </select>

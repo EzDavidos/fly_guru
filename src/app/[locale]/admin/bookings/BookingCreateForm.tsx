@@ -20,9 +20,11 @@ const inputClass =
 export function BookingCreateForm({
   services,
   today,
+  paymentMethods,
 }: {
   services: ServiceOption[];
   today: string;
+  paymentMethods: { id: string; name: string }[];
 }) {
   const [state, formAction, pending] = useActionState(createBookingAction, {
     error: null,
@@ -91,6 +93,21 @@ export function BookingCreateForm({
           </select>
         </label>
       </div>
+
+      {/* Формат оплаты (пак A, пункт 6) — здесь НЕобязателен: заявка это
+          договорённость, клиент ещё не платил. Заполняют, когда о способе
+          условились заранее (например, гость сказал «переведу на T-Bank»). */}
+      <label className="block text-xs text-muted">
+        Формат оплаты
+        <select name="paymentMethodId" className={`mt-1 ${inputClass}`}>
+          <option value="">— пока неизвестен —</option>
+          {paymentMethods.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-muted">

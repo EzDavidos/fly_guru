@@ -11,6 +11,7 @@ import {
 } from "../actions";
 import { MANUAL_CHANNELS } from "@/lib/channels";
 import { SaveForm } from "../SaveForm";
+import { getActiveDict } from "@/lib/dictionaries";
 import { BookingCreateForm } from "./BookingCreateForm";
 
 export const metadata: Metadata = { title: "Админка · Заявки" };
@@ -321,6 +322,7 @@ export default async function AdminBookingsPage({
   const { status: filter = "" } = await searchParams;
   const supabase = await createClient();
   const today = vnToday();
+  const paymentMethods = await getActiveDict(supabase, "payment_methods");
 
   // Услуги для формы ручной заявки. Абонемент отсюда исключён намеренно: его
   // продают через /admin/subscriptions, иначе продажа пройдёт мимо минут
@@ -400,7 +402,11 @@ export default async function AdminBookingsPage({
       </p>
 
       <div className="mt-4">
-        <BookingCreateForm services={services} today={today} />
+        <BookingCreateForm
+          services={services}
+          today={today}
+          paymentMethods={paymentMethods}
+        />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">

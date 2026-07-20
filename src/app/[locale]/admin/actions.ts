@@ -9,6 +9,8 @@ import { subscriptionExpiry, vnToday } from "@/lib/dates";
 import { minutesLeft } from "@/lib/subscriptions";
 import { sendInstructorsBookingAlert } from "@/lib/telegram";
 import { MANUAL_CHANNELS } from "@/lib/channels";
+import { DICT_LABEL, type DictTable } from "@/lib/dictionaries";
+import { parseVnd } from "@/lib/money";
 import type { ActionState } from "../instructor/actions";
 
 // Server actions админки: полный цикл заявки. Админ созванивается с гостем,
@@ -133,6 +135,9 @@ export async function createBookingAction(
       preferred_date: preferredDate || null,
       status: confirmed ? "confirmed" : "new",
       src: channel,
+      // Формат оплаты в заявке необязателен — клиент ещё не платил (пак A).
+      payment_method_id:
+        String(formData.get("paymentMethodId") ?? "").trim() || null,
       ...bookingFields(formData),
     })
     .select("id")
@@ -180,18 +185,7 @@ export async function setStatusAction(status: string, formData: FormData) {
 
 // ── Сессии (подэтап 4.2) ─────────────────────────────────────────────────────
 // Сумма и дата в форме — как их вводит человек: «1 500 000», «1.500.000».
-// Точка и запятая — ТОЛЬКО разделитель тысяч, поэтому требуем группы ровно по
-// три цифры. Раньше разделители выкидывались без разбора, и «1.5» (в смысле
-// «полтора миллиона») молча становилось чеком в 15 ₫ — без единой ошибки на
-// экране. В донгах дробей не бывает: не угадываем, а возвращаем null, и
-// вызывающий показывает «Сумма — число в донгах».
-function parseVnd(raw: FormDataEntryValue | null): number | null {
-  const s = String(raw ?? "").replace(/\s/g, "");
-  if (!s) return null;
-  if (/^\d+$/.test(s)) return Number(s);
-  if (/^\d{1,3}([.,]\d{3})+$/.test(s)) return Number(s.replace(/[.,]/g, ""));
-  return null;
-}
+// Разбор живёт в lib/money (его же зовёт кабинет инструктора, пак A).
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -340,12 +334,18 @@ export async function createSessionAction(
   }
   if (amount === null) return { error: "Сумма — число в донгах, например 1 500 000." };
 
+  // Формат оплаты (пак A, пункт 6). У админа обязателен так же, как у
+  // инструктора: сессия задним числом — тоже состоявшаяся оплата.
+  const paymentMethodId = String(formData.get("paymentMethodId") ?? "").trim();
+  if (!paymentMethodId) return { error: "Укажите формат оплаты." };
+
   const { error: insError } = await supabase.from("sessions").insert({
     client_id: clientId,
     service_id: serviceId,
     instructor_id: instructorId,
     date,
     amount,
+    payment_method_id: paymentMethodId,
     created_by: admin.id,
   });
   if (insError) return { error: `Не удалось создать сессию: ${insError.message}` };
@@ -962,7 +962,10 @@ export async function addExpenseAction(
   const { error } = await supabase.from("expenses").insert({
     date,
     amount,
-    category: String(formData.get("category") ?? "").trim() || null,
+    // Категория — из справочника (0016). Необязательна: расход «просто трата»
+    // тоже имеет право на жизнь, и заставлять заводить категорию ради него
+    // значило бы засорять справочник одноразовыми позициями.
+    category_id: String(formData.get("categoryId") ?? "").trim() || null,
     comment: String(formData.get("comment") ?? "").trim() || null,
     created_by: admin.id,
   });
@@ -1017,5 +1020,60 @@ export async function removeShiftAction(formData: FormData) {
     .eq("instructor_id", instructorId)
     .eq("date", date);
   failIfError(error, "не удалось убрать смену");
+  revalidatePath("/", "layout");
+}
+
+// ── Справочники: категории расходов и форматы оплаты (пачка №4, пак A) ────────
+// Обе таблицы устроены одинаково (name + active), поэтому экшены общие, а какой
+// именно справочник править — приходит полем формы. Валидируем имя таблицы по
+// белому списку: иначе значением из формы можно было бы дотянуться до любой
+// таблицы базы.
+const DICT_TABLES: DictTable[] = ["expense_categories", "payment_methods"];
+
+function dictTable(formData: FormData): DictTable | null {
+  const table = String(formData.get("table") ?? "");
+  return (DICT_TABLES as string[]).includes(table) ? (table as DictTable) : null;
+}
+
+export async function addDictItemAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const table = dictTable(formData);
+  if (!table) return { error: "Неизвестный справочник." };
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Введите название." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from(table).insert({ name });
+  // 23505 = такое имя уже есть. Для человека это не ошибка ввода, а «оно уже
+  // заведено» — говорим прямо, вместо сырого текста от Postgres.
+  if (error?.code === "23505") {
+    return { error: `«${name}» уже есть в справочнике.` };
+  }
+  if (error) return { error: `Не удалось добавить: ${error.message}` };
+
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+// Скрыть/вернуть позицию. Именно скрыть, а не удалить: на категорию могут
+// ссылаться прошлые расходы, на формат оплаты — прошлые сессии. Удаление
+// оборвало бы ссылку и обнулило историю.
+export async function toggleDictItemAction(formData: FormData) {
+  await requireAdmin();
+
+  const table = dictTable(formData);
+  const id = String(formData.get("id") ?? "");
+  if (!table || !id) return;
+
+  const active = String(formData.get("active") ?? "") === "true";
+
+  const supabase = await createClient();
+  const { error } = await supabase.from(table).update({ active }).eq("id", id);
+  failIfError(error, `не удалось изменить справочник (${DICT_LABEL[table]})`);
   revalidatePath("/", "layout");
 }
