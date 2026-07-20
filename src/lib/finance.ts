@@ -74,7 +74,9 @@ export async function getFinance(
         .lt("paid_at", range.toIso),
       supabase
         .from("expenses")
-        .select("id, date, category, amount, comment")
+        .select(
+          "id, date, amount, comment, category:expense_categories!category_id(name)",
+        )
         .gte("date", range.fromDay)
         .lt("date", range.toDay)
         .order("amount", { ascending: false }),
@@ -117,7 +119,10 @@ export async function getFinance(
   const manualExpenses = (expensesRes.data ?? []).map((e) => ({
     id: e.id as string,
     date: e.date as string,
-    category: (e.category as string | null) ?? null,
+    // Категория приходит вложенным объектом из справочника (0016). Её может не
+    // быть: у расхода категория необязательна, и до 0016 она была текстом.
+    category:
+      (e.category as unknown as { name: string } | null)?.name ?? null,
     amount: Number(e.amount ?? 0),
     comment: (e.comment as string | null) ?? null,
   }));

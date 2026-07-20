@@ -8,6 +8,7 @@ import { getAppUser, type AppUser } from "@/lib/auth";
 import { phoneDigits, phonesMatch } from "@/lib/phone";
 import { vnToday, subscriptionExpiry } from "@/lib/dates";
 import { minutesLeft } from "@/lib/subscriptions";
+import { parseVnd } from "@/lib/money";
 
 // Server actions кабинета инструктора. Общий принцип безопасности:
 // instructor_id / sold_by / created_by берутся из СЕССИИ на сервере (user.id),
@@ -131,9 +132,16 @@ export async function recordClientAction(
   // инструктор — сообщает админу, тот правит через админку.
   const date = vnToday();
   const bookingId = String(formData.get("bookingId") ?? "") || null;
+  // Формат оплаты обязателен (пак A, пункт 6). Проверяем и на сервере, а не
+  // только через required в разметке: required обходится, а дыра в отчёте
+  // «чем платят» потом не восстанавливается.
+  const paymentMethodId = String(formData.get("paymentMethodId") ?? "").trim();
 
   if (!name || !phone || !serviceId) {
     return { error: "Заполните имя, телефон и услугу." };
+  }
+  if (!paymentMethodId) {
+    return { error: "Укажите формат оплаты." };
   }
 
   // Реф-код берём из ЗАЯВКИ на сервере (не из формы — там его можно подменить).
@@ -202,6 +210,7 @@ export async function recordClientAction(
     instructor_id: user.id,
     date,
     amount,
+    payment_method_id: paymentMethodId,
     created_by: user.id,
   });
   if (sessionError) return { error: `Не удалось записать: ${sessionError.message}` };
@@ -489,4 +498,57 @@ export async function setTourApprovedAction(formData: FormData) {
     .eq("id", clientId);
   if (error) console.error("[instructor] tour approval error:", error.message);
   revalidatePath("/instructor/stats");
+}
+
+// ── Расходы инструктора (пачка №4, пак A, пункт 3) ───────────────────────────
+// Инструктор тратит свои деньги по работе (топливо, мелкий ремонт) и вносит
+// это сам. created_by берётся из сессии — RLS (expenses_instructor_*_own в
+// 0016) пускает его только к собственным строкам, чужие суммы он не увидит.
+// В «Дополнительные расходы» админки они падают наравне с админскими: для
+// P&L школы неважно, чьей рукой внесена трата.
+export async function addInstructorExpenseAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireStaff();
+
+  const amount = parseVnd(formData.get("amount"));
+  if (!amount || amount <= 0) return { error: "Сумма — число в донгах." };
+
+  const dateRaw = String(formData.get("date") ?? "").trim();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : vnToday();
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("expenses").insert({
+    date,
+    amount,
+    category_id: String(formData.get("categoryId") ?? "").trim() || null,
+    comment: String(formData.get("comment") ?? "").trim() || null,
+    created_by: user.id,
+  });
+  if (error) return { error: `Не удалось добавить расход: ${error.message}` };
+
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+// Удалить можно только свой расход: .eq("created_by", user.id) — не столько
+// защита (её держит RLS), сколько честный ноль строк вместо тихого успеха,
+// если id прилетел чужой.
+export async function deleteInstructorExpenseAction(formData: FormData) {
+  const user = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("expenses")
+    .delete()
+    .eq("id", id)
+    .eq("created_by", user.id);
+  if (error) {
+    console.error("[instructor] expense delete error:", error.message);
+    throw new Error(`не удалось удалить расход: ${error.message}`);
+  }
+  revalidatePath("/", "layout");
 }

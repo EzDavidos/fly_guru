@@ -23,6 +23,7 @@ const NAV: NavItem[] = [
   { href: "/instructor/stats", label: "Статистика", hint: "за любой период" },
   { href: "/instructor/subscription", label: "Абонемент", hint: "продажа" },
   { href: "/instructor/writeoff", label: "Списание", hint: "минуты" },
+  { href: "/instructor/expenses", label: "Расходы", hint: "свои траты" },
   { href: "/instructor/settings", label: "Настройки", hint: "имя · фото · цель" },
 ];
 

@@ -5,8 +5,9 @@ import { vnd } from "@/lib/stats";
 import { getFinance } from "@/lib/finance";
 import { MonthSwitcher, resolveYm } from "../MonthSwitcher";
 import { ConfirmSubmit } from "../ConfirmSubmit";
-import { deleteExpenseAction } from "../actions";
-import { ExpenseForm } from "./ExpenseForm";
+import { deleteExpenseAction, addExpenseAction } from "../actions";
+import { getActiveDict } from "@/lib/dictionaries";
+import { ExpenseFields } from "@/components/cabinet/ExpenseFields";
 
 export const metadata: Metadata = { title: "Админка · Расходы" };
 
@@ -46,7 +47,10 @@ export default async function AdminExpensesPage({
   const month = vnMonth(ym);
 
   const supabase = await createClient();
-  const fin = await getFinance(supabase, month);
+  const [fin, categories] = await Promise.all([
+    getFinance(supabase, month),
+    getActiveDict(supabase, "expense_categories"),
+  ]);
 
   return (
     <div>
@@ -153,7 +157,11 @@ export default async function AdminExpensesPage({
         <div className="mt-4 border-t border-line pt-4">
           <h3 className="text-sm font-bold">Добавить расход</h3>
           <div className="mt-3">
-            <ExpenseForm today={vnToday()} />
+            <ExpenseFields
+              action={addExpenseAction}
+              today={vnToday()}
+              categories={categories}
+            />
           </div>
         </div>
       </section>
