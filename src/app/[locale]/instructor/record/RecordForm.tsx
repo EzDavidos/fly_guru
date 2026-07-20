@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { recordClientAction, type ActionState } from "../actions";
+import { PhoneField } from "@/components/cabinet/PhoneField";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -12,6 +13,7 @@ export interface RecordPrefill {
   phone?: string;
   serviceId?: string;
   refCode?: string | null;
+  telegram?: string | null;
 }
 
 interface RecordFormProps {
@@ -59,19 +61,12 @@ export function RecordForm({
         />
       </div>
 
-      <div>
-        <label htmlFor="phone" className="mb-1 block text-sm font-medium">
-          Телефон *
-        </label>
-        <input
-          id="phone"
-          name="phone"
-          type="tel"
-          required
-          defaultValue={prefill?.phone ?? ""}
-          className={inputClass}
-        />
-      </div>
+      {/* Телефон + подсказка «клиент уже в базе» + ник в телеге (пак B). */}
+      <PhoneField
+        defaultValue={prefill?.phone ?? ""}
+        telegramDefault={prefill?.telegram ?? ""}
+        className={inputClass}
+      />
 
       {/* Город — только для НОВОГО клиента (у существующего берётся из карточки
           и не перезаписывается). Необязательное поле. */}

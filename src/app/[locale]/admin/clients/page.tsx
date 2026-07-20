@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { phoneDigits } from "@/lib/phone";
 import { vnd } from "@/lib/stats";
 import { updateClientAction } from "../actions";
 import { SaveForm } from "../SaveForm";
+import { ClientPhoto } from "./ClientPhoto";
 
 export const metadata: Metadata = { title: "Админка · Клиенты" };
 
@@ -23,6 +25,8 @@ interface ClientRow {
   age: number | null;
   city: string | null;
   tour_approved: boolean;
+  telegram_username: string | null;
+  photo_url: string | null;
   created_at: string;
 }
 
@@ -67,6 +71,17 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
   return (
     <details className="group rounded-2xl border border-line bg-surface">
       <summary className="flex cursor-pointer list-none items-center gap-2 p-4 [&::-webkit-details-marker]:hidden">
+        {/* Миниатюра в свёрнутой строке: админ узнаёт человека в лицо,
+            не раскрывая карточку (пак B, пункт 7). */}
+        {c.photo_url ? (
+          <Image
+            src={c.photo_url}
+            alt={c.name}
+            width={36}
+            height={36}
+            className="h-9 w-9 shrink-0 rounded-full object-cover"
+          />
+        ) : null}
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold">
             {stats.member && <span title="Член клуба">⭐ </span>}
@@ -105,6 +120,16 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
               {c.phone}
             </a>
           )}
+          {c.telegram_username && (
+            <a
+              href={`https://t.me/${c.telegram_username}`}
+              target="_blank"
+              rel="noreferrer"
+              className="block text-primary underline"
+            >
+              @{c.telegram_username}
+            </a>
+          )}
           <p>
             Источник: {SOURCE_LABEL[c.source] ?? c.source}
             {stats.agentName && ` — ${stats.agentName}`}
@@ -119,6 +144,10 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
             <span className="font-bold text-ink">{vnd(stats.spent)}</span>
             {stats.lastVisit && ` · был ${fmtDay(stats.lastVisit)}`}
           </p>
+        </div>
+
+        <div className="mt-3">
+          <ClientPhoto clientId={c.id} photoUrl={c.photo_url} name={c.name} />
         </div>
 
         <SaveForm action={updateClientAction} className="mt-3">
@@ -164,6 +193,18 @@ function ClientCard({ c, stats }: { c: ClientRow; stats: ClientStats }) {
               />
             </label>
           </div>
+          <label className="mt-2 block text-xs text-muted">
+            Ник в Telegram · необязательно
+            <input
+              type="text"
+              name="telegramUsername"
+              defaultValue={c.telegram_username ?? ""}
+              placeholder="@nickname"
+              autoCapitalize="off"
+              autoCorrect="off"
+              className={`mt-1 ${inputClass}`}
+            />
+          </label>
           <label className="mt-2 block text-xs text-muted">
             Внутренняя заметка (клиент не видит)
             <textarea
@@ -212,7 +253,7 @@ export default async function AdminClientsPage({
     supabase
       .from("clients")
       .select(
-        "id, name, phone, source, referrer_type, referrer_id, internal_note, age, city, tour_approved, created_at",
+        "id, name, phone, source, referrer_type, referrer_id, internal_note, age, city, tour_approved, telegram_username, photo_url, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(1000),

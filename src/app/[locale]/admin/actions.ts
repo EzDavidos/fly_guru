@@ -3,14 +3,22 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppUser } from "@/lib/auth";
-import { phoneDigits, phonesMatch } from "@/lib/phone";
+import {
+  phoneDigits,
+  phonesMatch,
+  isValidPhone,
+  normalizeTelegram,
+  PHONE_ERROR,
+} from "@/lib/phone";
 import { subscriptionExpiry, vnToday } from "@/lib/dates";
 import { minutesLeft } from "@/lib/subscriptions";
 import { sendInstructorsBookingAlert } from "@/lib/telegram";
 import { MANUAL_CHANNELS } from "@/lib/channels";
 import { DICT_LABEL, type DictTable } from "@/lib/dictionaries";
 import { parseVnd } from "@/lib/money";
+import { checkPhoto } from "@/lib/photos";
 import type { ActionState } from "../instructor/actions";
 
 // Server actions админки: полный цикл заявки. Админ созванивается с гостем,
@@ -218,13 +226,26 @@ async function resolveClient(
   if (!name || !phone) {
     return { error: "Выберите клиента из списка или заполните имя и телефон нового." };
   }
+  if (!isValidPhone(phone)) return { error: PHONE_ERROR };
+
+  const telegram = normalizeTelegram(formData.get("telegramUsername") as string);
+
   const { data: existing } = await supabase
     .from("clients")
-    .select("id, phone")
+    .select("id, phone, telegram_username")
     .not("phone", "is", null)
     .limit(1000);
   const match = (existing ?? []).find((c) => phonesMatch(c.phone, phone));
-  if (match) return { id: match.id };
+  if (match) {
+    // Ник дописываем только в пустое поле — см. findOrCreateClient.
+    if (telegram && !match.telegram_username) {
+      await supabase
+        .from("clients")
+        .update({ telegram_username: telegram })
+        .eq("id", match.id);
+    }
+    return { id: match.id };
+  }
 
   const { data: created, error } = await supabase
     .from("clients")
@@ -232,6 +253,7 @@ async function resolveClient(
       name,
       phone: phoneDigits(phone) || phone,
       city: String(formData.get("newCity") ?? "").trim() || null,
+      telegram_username: telegram,
       source: "offline",
       created_by: adminId,
       created_at: createdAt,
@@ -596,6 +618,18 @@ export async function updateClientAction(formData: FormData) {
   if (!id || !name) return;
 
   const phoneRaw = String(formData.get("phone") ?? "").trim();
+
+  // Ник в телеге: пусто — очистить, валидный — сохранить, кривой — отказать.
+  // Молча превращать опечатку в null нельзя: админ правил бы заметку, а ник
+  // при этом исчезал без единого слова на экране.
+  const tgRaw = String(formData.get("telegramUsername") ?? "").trim();
+  const telegram = tgRaw ? normalizeTelegram(tgRaw) : null;
+  if (tgRaw && !telegram) {
+    throw new Error(
+      "ник в Telegram: 5–32 символа — буквы, цифры, подчёркивание",
+    );
+  }
+
   // Возраст: пусто или мусор → null («не указан»).
   const ageNum = Math.floor(Number(formData.get("age")));
   const supabase = await createClient();
@@ -608,10 +642,56 @@ export async function updateClientAction(formData: FormData) {
       city: String(formData.get("city") ?? "").trim() || null,
       internal_note: String(formData.get("note") ?? "").trim() || null,
       tour_approved: formData.get("tour_approved") === "1",
+      telegram_username: telegram,
     })
     .eq("id", id);
   failIfError(error, "не удалось сохранить карточку клиента");
   revalidatePath("/", "layout");
+}
+
+// Фото клиента (пак B, пункт 7): админ просил возможность вспомнить, как
+// человек выглядит — имена в базе повторяются, лица нет.
+//
+// Отдельный экшен, а не поле в updateClientAction: карточка клиента
+// сохраняется через SaveForm без файлов, и подмешивать туда multipart значило
+// бы гонять фото при каждом правлении заметки. Пишем под service_role — на
+// бакете clients нет политик записи намеренно (0017).
+export async function uploadClientPhotoAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Клиент не найден." };
+
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) {
+    return { error: "Выберите фото." };
+  }
+  const checked = checkPhoto(photo);
+  if (checked.error) return { error: checked.error };
+
+  const admin = createAdminClient();
+  // Путь стабильный (одно фото на клиента, upsert перезаписывает старое),
+  // а ?v= в сохранённом URL сбрасывает кеш браузера и next/image.
+  const path = `${id}.${checked.ext}`;
+  const { error: uploadError } = await admin.storage
+    .from("clients")
+    .upload(path, photo, { upsert: true, contentType: photo.type });
+  if (uploadError) {
+    return { error: `Не удалось загрузить фото: ${uploadError.message}` };
+  }
+
+  const { data: pub } = admin.storage.from("clients").getPublicUrl(path);
+  const { error } = await admin
+    .from("clients")
+    .update({ photo_url: `${pub.publicUrl}?v=${Date.now()}` })
+    .eq("id", id);
+  if (error) return { error: `Не удалось сохранить фото: ${error.message}` };
+
+  revalidatePath("/", "layout");
+  return { error: null };
 }
 
 // ── Агенты (подэтап 4.5) ─────────────────────────────────────────────────────

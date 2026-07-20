@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { sendBookingNotification } from "@/lib/telegram";
+import { isValidPhone, normalizeTelegram, phoneDigits } from "@/lib/phone";
 
 // «Серверная дверь» для заявок с форм. Форма шлёт сюда данные, а здесь мы их
 // проверяем, защищаем от спама и сохраняем в таблицу bookings.
@@ -9,7 +10,8 @@ import { sendBookingNotification } from "@/lib/telegram";
 // Форма присылает вот такой набор полей.
 interface BookingPayload {
   clientName?: string;
-  contact?: string; // телефон/ник в мессенджере, как ввёл гость
+  contact?: string; // телефон, как ввёл гость
+  telegram?: string; // ник в телеге — необязателен (0018)
   messenger?: string; // WhatsApp / Telegram / Zalo
   serviceId?: string; // uuid услуги из таблицы services
   preferredDate?: string; // желаемая дата 'YYYY-MM-DD'
@@ -63,6 +65,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Телефон проверяем и здесь, а не только в форме: проверку на клиенте
+  // обходит кто угодно, а заявка без рабочего номера — это клиент, до
+  // которого школа не дозвонится, и узнают об этом через сутки.
+  if (!isValidPhone(contact)) {
+    return NextResponse.json(
+      { ok: false, error: "bad_phone" },
+      { status: 400 },
+    );
+  }
+
   const serviceId = body.serviceId && isUuid(body.serviceId) ? body.serviceId : null;
   const messenger = body.messenger?.trim() || null;
   const comment = body.comment?.trim() || null;
@@ -87,7 +99,10 @@ export async function POST(req: NextRequest) {
     .from("bookings")
     .insert({
       client_name: clientName,
-      phone: contact,
+      // Храним цифрами: так заявка сматчится с карточкой клиента по телефону
+      // (phonesMatch сравнивает хвост), как бы гость ни расставил пробелы.
+      phone: phoneDigits(contact) || contact,
+      telegram_username: normalizeTelegram(body.telegram),
       service_id: serviceId,
       preferred_date: preferredDate,
       ref_code: refCode,

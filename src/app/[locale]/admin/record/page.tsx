@@ -44,7 +44,7 @@ export default async function AdminRecordPage({
   if (bookingId) {
     const { data: booking } = await supabase
       .from("bookings")
-      .select("id, client_name, phone, service_id, ref_code, preferred_date")
+      .select("id, client_name, phone, service_id, ref_code, preferred_date, telegram_username")
       .eq("id", bookingId)
       .maybeSingle();
     if (booking) {
@@ -58,6 +58,7 @@ export default async function AdminRecordPage({
         phone: booking.phone,
         serviceId: booking.service_id ?? undefined,
         refCode: booking.ref_code,
+        telegram: booking.telegram_username,
         date: day && day <= today ? day : today,
       };
     }

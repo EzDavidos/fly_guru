@@ -26,6 +26,7 @@ interface BookingRow {
   booking_no: number | null;
   client_name: string;
   phone: string;
+  telegram_username: string | null;
   preferred_date: string | null;
   scheduled_time: string | null;
   age: number | null;
@@ -137,6 +138,18 @@ function BookingCard({
           <a href={`tel:${b.phone}`} className="text-primary underline">
             {b.phone}
           </a>
+          {/* Ник в телеге приходит с сайта (0018) — второй способ достучаться,
+              когда номер не отвечает. */}
+          {b.telegram_username && (
+            <a
+              href={`https://t.me/${b.telegram_username}`}
+              target="_blank"
+              rel="noreferrer"
+              className="block text-primary underline"
+            >
+              @{b.telegram_username}
+            </a>
+          )}
           {b.accepted && (
             <p className="text-muted">
               Принял: <span className="text-primary">{b.accepted.name}</span>
@@ -341,7 +354,7 @@ export default async function AdminBookingsPage({
   const { data } = await supabase
     .from("bookings")
     .select(
-      "id, booking_no, client_name, phone, preferred_date, scheduled_time, age, weight, status, pinned, ref_code, src, utm, internal_note, client_id, rescheduled_at, created_at, services(name), accepted:users!accepted_by(name)",
+      "id, booking_no, client_name, phone, telegram_username, preferred_date, scheduled_time, age, weight, status, pinned, ref_code, src, utm, internal_note, client_id, rescheduled_at, created_at, services(name), accepted:users!accepted_by(name)",
     )
     .order("created_at", { ascending: false })
     .limit(200);

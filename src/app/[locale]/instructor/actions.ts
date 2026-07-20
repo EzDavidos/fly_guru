@@ -5,10 +5,17 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppUser, type AppUser } from "@/lib/auth";
-import { phoneDigits, phonesMatch } from "@/lib/phone";
+import {
+  phoneDigits,
+  phonesMatch,
+  isValidPhone,
+  normalizeTelegram,
+  PHONE_ERROR,
+} from "@/lib/phone";
 import { vnToday, subscriptionExpiry } from "@/lib/dates";
 import { minutesLeft } from "@/lib/subscriptions";
 import { parseVnd } from "@/lib/money";
+import { checkPhoto } from "@/lib/photos";
 
 // Server actions кабинета инструктора. Общий принцип безопасности:
 // instructor_id / sold_by / created_by берутся из СЕССИИ на сервере (user.id),
@@ -42,12 +49,13 @@ async function findOrCreateClient(
     phone: string;
     source: "site" | "offline";
     city?: string | null;
+    telegram?: string | null;
     referrer?: { type: "agent"; id: string } | null;
   },
 ): Promise<{ id: string; existingName?: string } | { error: string }> {
   const { data: existing, error: selError } = await supabase
     .from("clients")
-    .select("id, name, phone")
+    .select("id, name, phone, telegram_username")
     .not("phone", "is", null)
     .limit(1000);
   if (selError) return { error: `Не удалось найти клиента: ${selError.message}` };
@@ -56,7 +64,18 @@ async function findOrCreateClient(
   // Введённое имя при этом НЕ перезаписывает старое — сообщаем вызвавшему,
   // на кого реально легла запись (иначе кажется, что клиент «потерялся»).
   const match = (existing ?? []).find((c) => phonesMatch(c.phone, input.phone));
-  if (match) return { id: match.id, existingName: match.name ?? undefined };
+  if (match) {
+    // Ник в телеге дописываем, только если его ещё нет: у постоянного клиента
+    // в карточке может стоять выверенный контакт, и затирать его случайной
+    // опечаткой из сегодняшней формы нельзя.
+    if (input.telegram && !match.telegram_username) {
+      await supabase
+        .from("clients")
+        .update({ telegram_username: input.telegram })
+        .eq("id", match.id);
+    }
+    return { id: match.id, existingName: match.name ?? undefined };
+  }
 
   const { data: created, error: insError } = await supabase
     .from("clients")
@@ -64,6 +83,7 @@ async function findOrCreateClient(
       name: input.name,
       phone: phoneDigits(input.phone) || input.phone,
       city: input.city || null,
+      telegram_username: input.telegram || null,
       source: input.referrer ? "agent" : input.source,
       referrer_type: input.referrer?.type ?? null,
       referrer_id: input.referrer?.id ?? null,
@@ -140,6 +160,11 @@ export async function recordClientAction(
   if (!name || !phone || !serviceId) {
     return { error: "Заполните имя, телефон и услугу." };
   }
+  // Длину номера проверяем и на сервере: в разметке она подсказка, здесь —
+  // правило. Кривой номер = потерянный клиент, чинить его потом некому.
+  if (!isValidPhone(phone)) {
+    return { error: PHONE_ERROR };
+  }
   if (!paymentMethodId) {
     return { error: "Укажите формат оплаты." };
   }
@@ -179,6 +204,7 @@ export async function recordClientAction(
     name,
     phone,
     city,
+    telegram: normalizeTelegram(formData.get("telegramUsername") as string),
     source: bookingId ? "site" : "offline",
     referrer: agent ? { type: "agent", id: agent.id } : null,
   });
@@ -369,17 +395,6 @@ export async function writeOffAction(
 }
 
 // ── Настройки профиля ────────────────────────────────────────────────────────
-// Форматы, которые умеет отдавать next/image; iPhone при таком accept сам
-// конвертирует HEIC в JPEG при выборе из галереи.
-const AVATAR_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-// Чуть меньше лимита тела server actions (5 МБ в next.config.ts), чтобы
-// остальные поля формы гарантированно влезли. Продублировано в SettingsForm
-// ("use server"-файл не может экспортировать константы).
-const AVATAR_MAX_BYTES = 4 * 1024 * 1024;
 
 export async function updateProfileAction(
   _prev: ActionState,
@@ -416,11 +431,9 @@ export async function updateProfileAction(
 
   const photo = formData.get("photo");
   if (photo instanceof File && photo.size > 0) {
-    const ext = AVATAR_TYPES[photo.type];
-    if (!ext) return { error: "Фото — только JPG, PNG или WebP." };
-    if (photo.size > AVATAR_MAX_BYTES) {
-      return { error: "Фото больше 4 МБ. Выберите другое или сожмите." };
-    }
+    const checked = checkPhoto(photo);
+    if (checked.error) return { error: checked.error };
+    const ext = checked.ext;
 
     // Путь стабильный (одна аватарка на пользователя, upsert перезаписывает
     // старую), а ?v= в сохранённом URL сбрасывает кеш браузера и next/image.
@@ -551,4 +564,82 @@ export async function deleteInstructorExpenseAction(formData: FormData) {
     throw new Error(`не удалось удалить расход: ${error.message}`);
   }
   revalidatePath("/", "layout");
+}
+
+// ── Подсказка «этот клиент уже у нас» (пачка №4, пак B, пункт 10) ────────────
+// Форма записи дёргает это по мере набора телефона. Смысл: инструктор должен
+// узнать про повторного клиента ДО того, как оформит запись, — обучение ему
+// второй раз не нужно, а если у него живой абонемент, то и платить он сегодня
+// не должен. Раньше дубль по телефону разруливался молча уже после отправки:
+// сессия ложилась на старую карточку, но инструктор об этом не узнавал и успевал
+// провести (и взять деньги за) лишнее обучение.
+//
+// Возвращаем только то, что нужно показать. Ни заметок, ни сумм: подсказка
+// висит на экране в чужом присутствии.
+export interface ClientHint {
+  found: boolean;
+  name?: string;
+  trainingDone?: boolean; // уже проходил обучение — повторное не нужно
+  minutesLeft?: number; // остаток по активному абонементу
+  tourApproved?: boolean; // допущен к выездам
+  sessionsCount?: number;
+}
+
+export async function lookupClientByPhoneAction(phone: string): Promise<ClientHint> {
+  await requireStaff();
+  if (!isValidPhone(phone)) return { found: false };
+
+  const supabase = await createClient();
+  const { data: clients } = await supabase
+    .from("clients")
+    .select("id, name, phone, tour_approved")
+    .not("phone", "is", null)
+    .limit(1000);
+
+  const match = (clients ?? []).find((c) => phonesMatch(c.phone, phone));
+  if (!match) return { found: false };
+
+  // Обучение считаем пройденным по факту сессии категории training, а не по
+  // отдельному флажку: флажок пришлось бы кому-то ставить руками, а сессия
+  // и так есть — её нельзя забыть.
+  const [sessionsRes, subsRes] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select("id, services(category)")
+      .eq("client_id", match.id),
+    supabase
+      .from("subscriptions")
+      .select("id, total_minutes, status, expires_at")
+      .eq("client_id", match.id)
+      .eq("status", "active"),
+  ]);
+
+  const sessions = sessionsRes.data ?? [];
+  const trainingDone = sessions.some(
+    (s) =>
+      (s.services as unknown as { category: string } | null)?.category ===
+      "training",
+  );
+
+  // Остаток минут — по тем же правилам, что и на списании: считаем только
+  // непросроченные абонементы.
+  const now = new Date();
+  let minutes = 0;
+  for (const sub of subsRes.data ?? []) {
+    const expires = sub.expires_at ? new Date(sub.expires_at as string) : null;
+    if (expires && expires < now) continue;
+    minutes += await minutesLeft(supabase, {
+      id: sub.id as string,
+      total_minutes: sub.total_minutes as number,
+    });
+  }
+
+  return {
+    found: true,
+    name: match.name as string,
+    trainingDone,
+    minutesLeft: minutes,
+    tourApproved: Boolean(match.tour_approved),
+    sessionsCount: sessions.length,
+  };
 }

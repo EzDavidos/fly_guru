@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createSessionAction } from "../actions";
+import { PhoneField } from "@/components/cabinet/PhoneField";
 import { vnd } from "@/lib/stats";
 
 // Админская «Запись клиента». Отдельная форма (а не форма сессий), потому что
@@ -22,6 +23,7 @@ export interface RecordPrefill {
   phone?: string;
   serviceId?: string;
   refCode?: string | null;
+  telegram?: string | null;
   date?: string; // дата из заявки — на неё и ляжет занятие
 }
 
@@ -92,28 +94,24 @@ export function RecordClientForm({
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs text-muted">
-          Имя клиента *
-          <input
-            type="text"
-            name="newName"
-            required
-            defaultValue={prefill?.name ?? ""}
-            className={`mt-1 ${inputClass}`}
-          />
-        </label>
-        <label className="text-xs text-muted">
-          Телефон *
-          <input
-            type="tel"
-            name="newPhone"
-            required
-            defaultValue={prefill?.phone ?? ""}
-            className={`mt-1 ${inputClass}`}
-          />
-        </label>
-      </div>
+      <label className="block text-xs text-muted">
+        Имя клиента *
+        <input
+          type="text"
+          name="newName"
+          required
+          defaultValue={prefill?.name ?? ""}
+          className={`mt-1 ${inputClass}`}
+        />
+      </label>
+
+      {/* Телефон + подсказка «клиент уже в базе» + ник в телеге (пак B). */}
+      <PhoneField
+        name="newPhone"
+        defaultValue={prefill?.phone ?? ""}
+        telegramDefault={prefill?.telegram ?? ""}
+        className={inputClass}
+      />
 
       {/* Формат оплаты (пак A, пункт 6) — обязателен, как и в форме сессий:
           обе формы постят в один createSessionAction. */}

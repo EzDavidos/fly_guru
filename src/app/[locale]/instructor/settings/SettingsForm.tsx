@@ -3,12 +3,12 @@
 import { useActionState, useState } from "react";
 import Image from "next/image";
 import { updateProfileAction, type ActionState } from "../actions";
+import { PHOTO_ACCEPT, PHOTO_MAX_BYTES } from "@/lib/photos";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
-// Дублирует AVATAR_MAX_BYTES из actions.ts (см. комментарий там).
-const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+const MAX_PHOTO_BYTES = PHOTO_MAX_BYTES;
 
 export function SettingsForm({
   name,
@@ -85,7 +85,7 @@ export function SettingsForm({
             id="photo"
             name="photo"
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept={PHOTO_ACCEPT}
             onChange={onPhotoChange}
             className="w-full text-sm text-muted file:mr-3 file:rounded-full file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary"
           />

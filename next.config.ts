@@ -20,12 +20,19 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: "attachment",
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    // Аватарки инструкторов лежат в публичном бакете Supabase Storage.
+    // Аватарки инструкторов и фото клиентов лежат в публичных бакетах
+    // Supabase Storage. Перечисляем бакеты поимённо, а не /public/** целиком:
+    // так новый бакет не начнёт раздаваться через наш домен по недосмотру.
     remotePatterns: [
       {
         protocol: "https",
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/avatars/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/clients/**",
       },
     ],
   },
