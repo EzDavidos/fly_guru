@@ -55,12 +55,17 @@ function SubscriptionCard({
   const expired =
     s.status === "expired" ||
     (s.expires_at !== null && new Date(s.expires_at) < new Date());
+  // «Сгорел» — истёк, а минуты остались: клиент их не откатал, деньги за них
+  // школа получила. Именно это админ хотел видеть (пак E, пункт 9).
+  const burned = expired && left > 0;
 
-  const statusLabel = expired
-    ? { text: "Истёк", cls: "bg-line text-muted" }
-    : s.status === "used_up"
-      ? { text: "Минуты кончились", cls: "bg-line text-muted" }
-      : { text: `${left} мин`, cls: "bg-primary/10 text-primary" };
+  const statusLabel = burned
+    ? { text: `Сгорело ${left} мин`, cls: "bg-red-500/10 text-red-600" }
+    : expired
+      ? { text: "Истёк", cls: "bg-line text-muted" }
+      : s.status === "used_up"
+        ? { text: "Минуты кончились", cls: "bg-line text-muted" }
+        : { text: `${left} мин`, cls: "bg-primary/10 text-primary" };
 
   return (
     <details className="group rounded-2xl border border-line bg-surface">
@@ -163,7 +168,6 @@ export default async function AdminSubscriptionsPage({
   searchParams: Promise<{ f?: string }>;
 }) {
   const { f = "" } = await searchParams;
-  const showAll = f === "all";
   const today = vnToday();
 
   const supabase = await createClient();
@@ -174,7 +178,15 @@ export default async function AdminSubscriptionsPage({
     )
     .order("sold_at", { ascending: false })
     .limit(100);
-  if (!showAll) subsQuery = subsQuery.eq("status", "active");
+  if (f === "burned") {
+    // Кандидаты в «сгоревшие»: срок вышел, а минуты не докатаны (used_up
+    // отсекаем — там докатали всё). Остаток >0 досчитаем в JS ниже.
+    subsQuery = subsQuery
+      .lt("expires_at", new Date().toISOString())
+      .neq("status", "used_up");
+  } else if (f !== "all") {
+    subsQuery = subsQuery.eq("status", "active");
+  }
 
   const [subsRes, clientsRes, staffRes] = await Promise.all([
     subsQuery,
@@ -233,6 +245,13 @@ export default async function AdminSubscriptionsPage({
     items.sort((a, b) => b.at.localeCompare(a.at));
   }
 
+  // Остаток минут: всего + корректировки − списания. Нужен и для карточки, и
+  // для отбора «сгоревших» (истёк с ненулевым остатком).
+  const leftOf = (s: SubRow) =>
+    s.total_minutes + (adjBySub.get(s.id) ?? 0) - (usedBySub.get(s.id) ?? 0);
+  const visibleSubs =
+    f === "burned" ? subs.filter((s) => leftOf(s) > 0) : subs;
+
   return (
     <div>
       <h1 className="text-2xl font-bold">Абонементы</h1>
@@ -257,6 +276,7 @@ export default async function AdminSubscriptionsPage({
       <div className="mt-4 flex gap-1.5">
         {[
           { key: "", label: "Активные" },
+          { key: "burned", label: "Сгоревшие" },
           { key: "all", label: "Все" },
         ].map((tab) => (
           <Link
@@ -273,15 +293,19 @@ export default async function AdminSubscriptionsPage({
         ))}
       </div>
 
-      {subs.length === 0 && (
-        <p className="mt-6 text-sm text-muted">Абонементов пока нет.</p>
+      {visibleSubs.length === 0 && (
+        <p className="mt-6 text-sm text-muted">
+          {f === "burned"
+            ? "Сгоревших абонементов нет — ни у кого минуты не прогорели."
+            : "Абонементов пока нет."}
+        </p>
       )}
       <div className="mt-4 space-y-3">
-        {subs.map((s) => (
+        {visibleSubs.map((s) => (
           <SubscriptionCard
             key={s.id}
             s={s}
-            left={s.total_minutes + (adjBySub.get(s.id) ?? 0) - (usedBySub.get(s.id) ?? 0)}
+            left={leftOf(s)}
             history={historyBySub.get(s.id) ?? []}
             today={today}
           />
