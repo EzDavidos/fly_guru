@@ -403,10 +403,13 @@ export default async function AdminDashboardPage({
         </Link>
       </div>
 
-      <form className="mt-3 flex items-end gap-2 lg:max-w-md" action="">
+      {/* flex-wrap + min-w на датах: нативный датапикер не сжимается ниже своей
+          ширины, без переноса на телефоне поля налезали друг на друга и на
+          кнопку. Кнопка на узком экране — отдельной строкой на всю ширину. */}
+      <form className="mt-3 flex flex-wrap items-end gap-2 lg:max-w-md" action="">
         {cat && <input type="hidden" name="cat" value={cat} />}
         {inst && <input type="hidden" name="inst" value={inst} />}
-        <label className="flex-1 text-xs text-muted">
+        <label className="min-w-[7.5rem] flex-1 text-xs text-muted">
           С
           <input
             type="date"
@@ -416,7 +419,7 @@ export default async function AdminDashboardPage({
             className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
           />
         </label>
-        <label className="flex-1 text-xs text-muted">
+        <label className="min-w-[7.5rem] flex-1 text-xs text-muted">
           По
           <input
             type="date"
@@ -428,7 +431,7 @@ export default async function AdminDashboardPage({
         </label>
         <button
           type="submit"
-          className="rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+          className="w-full rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white sm:w-auto"
         >
           Показать
         </button>
