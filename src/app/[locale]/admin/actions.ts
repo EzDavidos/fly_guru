@@ -17,6 +17,7 @@ import { minutesLeft } from "@/lib/subscriptions";
 import { sendInstructorsBookingAlert } from "@/lib/telegram";
 import { MANUAL_CHANNELS } from "@/lib/channels";
 import { DICT_LABEL, type DictTable } from "@/lib/dictionaries";
+import type { EquipmentKind } from "@/lib/equipment";
 import { parseVnd } from "@/lib/money";
 import { checkPhoto } from "@/lib/photos";
 import type { ActionState } from "../instructor/actions";
@@ -1155,5 +1156,47 @@ export async function toggleDictItemAction(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from(table).update({ active }).eq("id", id);
   failIfError(error, `не удалось изменить справочник (${DICT_LABEL[table]})`);
+  revalidatePath("/", "layout");
+}
+
+// ── Инвентарь: доски и крылья (пачка №4, пак C) ──────────────────────────────
+// Похоже на словари выше, но с колонкой kind: фото смены привязывается к
+// КОНКРЕТНОЙ единице. Скрываем, а не удаляем — на единицу ссылаются прошлые
+// фото смен, удаление оборвало бы связь.
+const EQUIPMENT_KINDS: EquipmentKind[] = ["board", "wing"];
+
+export async function addEquipmentAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const kind = String(formData.get("kind") ?? "") as EquipmentKind;
+  if (!EQUIPMENT_KINDS.includes(kind)) return { error: "Выберите доску или крыло." };
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Введите название." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("equipment").insert({ kind, name });
+  // 23505 = такая единица уже заведена (unique kind+name).
+  if (error?.code === "23505") {
+    return { error: `«${name}» уже есть в списке.` };
+  }
+  if (error) return { error: `Не удалось добавить: ${error.message}` };
+
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+export async function toggleEquipmentAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const active = String(formData.get("active") ?? "") === "true";
+  const supabase = await createClient();
+  const { error } = await supabase.from("equipment").update({ active }).eq("id", id);
+  failIfError(error, "не удалось изменить инвентарь");
   revalidatePath("/", "layout");
 }

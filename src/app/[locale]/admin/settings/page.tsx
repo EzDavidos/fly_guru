@@ -1,8 +1,10 @@
 import { getAppUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getFullDict } from "@/lib/dictionaries";
+import { getFullEquipment } from "@/lib/equipment";
 import { SettingsForm } from "@/app/[locale]/instructor/settings/SettingsForm";
 import { DictionaryManager } from "./DictionaryManager";
+import { EquipmentManager } from "./EquipmentManager";
 
 // Настройки админа: профиль (имя и фото — видны в карточке сайдбара кабинета)
 // и справочники школы (пак A). Форму профиля переиспользуем инструкторскую —
@@ -15,9 +17,10 @@ export default async function AdminSettingsPage() {
   if (!user) return null; // layout уже средиректил бы; страховка для типов
 
   const supabase = await createClient();
-  const [categories, methods] = await Promise.all([
+  const [categories, methods, equipment] = await Promise.all([
     getFullDict(supabase, "expense_categories"),
     getFullDict(supabase, "payment_methods"),
+    getFullEquipment(supabase),
   ]);
 
   return (
@@ -52,6 +55,30 @@ export default async function AdminSettingsPage() {
           placeholder="QR"
           items={methods}
         />
+      </div>
+
+      <div className="mt-6">
+        <h2 className="text-lg font-bold">Инвентарь</h2>
+        <p className="mt-1 text-sm text-muted">
+          Доски и крылья поштучно. Из этого списка инструктор выбирает единицу,
+          когда фотографирует смену при открытии и закрытии.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <EquipmentManager
+            kind="board"
+            title="Доски"
+            hint="По одной на строку — «Доска №1», «Fanatic 5.8»…"
+            placeholder="Доска №1"
+            items={equipment}
+          />
+          <EquipmentManager
+            kind="wing"
+            title="Крылья"
+            hint="По одному на строку — «Крыло 4.0», «Duotone Unit 5»…"
+            placeholder="Крыло 4.0"
+            items={equipment}
+          />
+        </div>
       </div>
     </div>
   );
