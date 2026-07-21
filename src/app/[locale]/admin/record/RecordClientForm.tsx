@@ -27,10 +27,12 @@ export interface RecordPrefill {
   date?: string; // дата из заявки — на неё и ляжет занятие
 }
 
-// Единая высота h-10 у всех полей — иначе нативный <input type="date"> в паре
-// с селектом «Инструктор» стоит на другом уровне (см. ExpenseFields).
-const inputClass =
-  "w-full h-10 rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-primary";
+// Единая высота h-10 у всех полей. Дата — компактная (задаёт ширину сама, как
+// в расходах): в w-full нативный <input type="date"> распирал ячейку сетки и
+// налезал на соседний селект. fieldBase — без ширины, inputClass — на всю.
+const fieldBase =
+  "h-10 rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-primary";
+const inputClass = `w-full ${fieldBase}`;
 
 export function RecordClientForm({
   services,
@@ -68,8 +70,10 @@ export function RecordClientForm({
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs text-muted">
+      {/* Дата — компактная (как в расходах), «Инструктор» занимает остаток
+          строки. Одной высоты, выровнены по низу. */}
+      <div className="flex items-end gap-2">
+        <label className="flex flex-col items-start text-xs text-muted">
           Дата (можно прошлую)
           <input
             type="date"
@@ -77,10 +81,10 @@ export function RecordClientForm({
             defaultValue={prefill?.date ?? today}
             max={today}
             required
-            className={`mt-1 ${inputClass}`}
+            className={`mt-1 ${fieldBase}`}
           />
         </label>
-        <label className="text-xs text-muted">
+        <label className="flex-1 text-xs text-muted">
           Инструктор
           <select
             name="instructorId"
