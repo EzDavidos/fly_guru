@@ -33,15 +33,20 @@ const KIND_LABEL: Record<PhotoKind, string> = {
 // Один загрузчик снимка. key завязан на число уже сделанных кадров этого слота:
 // после успешной загрузки счётчик растёт → форма перемонтируется → поля
 // очищаются сами. При ошибке счётчик прежний, форма остаётся с текстом ошибки.
+//
+// Отдельной кнопки «+» нет: снимок засчитывается СРАЗУ при выборе файла —
+// onChange дёргает form.requestSubmit() (он уважает required, так что для
+// доски/крыла без выбранной единицы инвентаря браузер подсветит поле и не
+// отправит). Так инструктор не делает лишнего действия и не забывает нажать.
 function PhotoUploader({
   phase,
   kind,
-  buttonLabel,
+  slotLabel,
   equipment,
 }: {
   phase: PhotoPhase;
   kind: PhotoKind;
-  buttonLabel: string;
+  slotLabel: string;
   equipment?: EquipmentItem[];
 }) {
   const [state, formAction, pending] = useActionState(addShiftPhotoAction, {
@@ -73,23 +78,21 @@ function PhotoUploader({
         </label>
       )}
       <label className="text-xs text-muted">
-        {equipment ? "Снимок" : KIND_LABEL[kind]}
+        {equipment ? `Снимок · ${slotLabel}` : slotLabel}
         <input
           type="file"
           name="photo"
           accept="image/*"
           capture="environment"
           required
-          className="mt-1 block w-full text-xs text-muted file:mr-3 file:rounded-full file:border-0 file:bg-line/50 file:px-3 file:py-1.5 file:text-xs file:font-semibold"
+          disabled={pending}
+          onChange={(e) => e.currentTarget.form?.requestSubmit()}
+          className="mt-1 block w-full text-xs text-muted file:mr-3 file:rounded-full file:border-0 file:bg-line/50 file:px-3 file:py-1.5 file:text-xs file:font-semibold disabled:opacity-60"
         />
       </label>
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-primary hover:text-primary disabled:opacity-60"
-      >
-        {pending ? "Загрузка…" : buttonLabel}
-      </button>
+      {pending && (
+        <span className="pb-2 text-xs font-semibold text-primary">Загрузка…</span>
+      )}
       {state.error && (
         <p className="w-full text-xs text-red-600">{state.error}</p>
       )}
@@ -144,33 +147,44 @@ function PhaseSection({
     <div className="space-y-4">
       {editable && (
         <div className="space-y-3">
-          {/* Слоты открываем через key от числа кадров — форма очищается сама. */}
+          {/* Обязательные слоты на виду. Слоты открываем через key от числа
+              кадров — форма очищается сама после успешной загрузки. */}
           <PhotoUploader
             key={`board-${photos.filter((p) => p.kind === "board").length}`}
             phase={phase}
             kind="board"
-            buttonLabel="+ доска"
+            slotLabel="доска"
             equipment={boards}
           />
           <PhotoUploader
             key={`wing-${photos.filter((p) => p.kind === "wing").length}`}
             phase={phase}
             kind="wing"
-            buttonLabel="+ крыло"
+            slotLabel="крыло"
             equipment={wings}
           />
-          <PhotoUploader
-            key={`comms-${photos.filter((p) => p.kind === "comms").length}`}
-            phase={phase}
-            kind="comms"
-            buttonLabel="+ связь"
-          />
-          <PhotoUploader
-            key={`extra-${photos.filter((p) => p.kind === "extra").length}`}
-            phase={phase}
-            kind="extra"
-            buttonLabel="+ дефект"
-          />
+          {/* Необязательные снимки (связь, дефекты) убраны под раскрытие —
+              обычно нужны только доска и крыло, остальное не мозолит глаза. */}
+          <details className="group rounded-xl border border-line/60 bg-bg/40 [&_summary::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-xs font-semibold text-muted">
+              Дополнительно
+              <span className="text-muted transition-transform group-open:rotate-180">▾</span>
+            </summary>
+            <div className="space-y-3 px-3 pb-3">
+              <PhotoUploader
+                key={`comms-${photos.filter((p) => p.kind === "comms").length}`}
+                phase={phase}
+                kind="comms"
+                slotLabel="связь"
+              />
+              <PhotoUploader
+                key={`extra-${photos.filter((p) => p.kind === "extra").length}`}
+                phase={phase}
+                kind="extra"
+                slotLabel="дефект"
+              />
+            </div>
+          </details>
         </div>
       )}
 
