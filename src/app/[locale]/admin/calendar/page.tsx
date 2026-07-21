@@ -2,12 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { vnToday, vnTimeLabel } from "@/lib/dates";
-import {
-  getMonthCalendar,
-  initials,
-  loadShiftPhotos,
-  type ShiftPhoto,
-} from "@/lib/shifts";
+import { getMonthCalendar, loadShiftPhotos, type ShiftPhoto } from "@/lib/shifts";
 import {
   shiftStatus,
   OPEN_LABEL,
@@ -82,14 +77,14 @@ export default async function AdminCalendarPage({
             return (
               <>
                 {entry.shifts.length > 0 && (
-                  <div className="flex flex-wrap gap-0.5">
+                  <div className="space-y-0.5">
                     {entry.shifts.map((s) => (
                       <span
                         key={s.id}
                         title={s.name}
-                        className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-accent/15 px-1 text-[10px] font-bold text-accent-strong"
+                        className="block truncate rounded bg-accent/15 px-1 text-[10px] font-bold text-accent-strong"
                       >
-                        {initials(s.name)}
+                        {s.name}
                       </span>
                     ))}
                   </div>

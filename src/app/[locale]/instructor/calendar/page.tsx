@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
 import { vnToday } from "@/lib/dates";
-import { getMonthCalendar, initials } from "@/lib/shifts";
+import { getMonthCalendar } from "@/lib/shifts";
 import { MonthGrid } from "@/components/cabinet/MonthGrid";
 import { CalMonthNav, resolveCalYm } from "@/components/cabinet/CalMonthNav";
 
@@ -58,20 +58,20 @@ export default async function InstructorCalendarPage({
             return (
               <>
                 {entry.shifts.length > 0 && (
-                  <div className="flex flex-wrap gap-0.5">
+                  <div className="space-y-0.5">
                     {entry.shifts.map((s) => {
                       const mine = s.instructorId === user.id;
                       return (
                         <span
                           key={s.id}
                           title={s.name}
-                          className={`inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-bold ${
+                          className={`block truncate rounded px-1 text-[10px] font-bold ${
                             mine
                               ? "bg-primary text-white"
                               : "bg-accent/15 text-accent-strong"
                           }`}
                         >
-                          {initials(s.name)}
+                          {s.name}
                         </span>
                       );
                     })}
