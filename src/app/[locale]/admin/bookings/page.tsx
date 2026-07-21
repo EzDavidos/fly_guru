@@ -258,7 +258,7 @@ function BookingCard({
               // Провести заявку как занятие: открывает «Запись клиента» с
               // предзаполненными полями; сохранение закроет заявку (done).
               <Link href={`/admin/record?booking=${b.id}`} className={btnGhost}>
-                Провести → запись
+                Записать клиента
               </Link>
             )}
             {!terminal && (

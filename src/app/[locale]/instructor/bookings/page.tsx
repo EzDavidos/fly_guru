@@ -124,7 +124,7 @@ export default async function InstructorBookingsPage() {
                     href={`/instructor/record?booking=${b.id}`}
                     className={`${actionButton} bg-accent text-white hover:bg-accent-strong`}
                   >
-                    Оформить
+                    Записать клиента
                   </Link>
                   <form action={declineBookingAction} className="shrink-0">
                     <input type="hidden" name="id" value={b.id} />
