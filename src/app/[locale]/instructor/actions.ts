@@ -26,8 +26,9 @@ export interface ActionState {
   error: string | null;
 }
 
-// Скидка по реф-ссылке — 200 000 ₫ на базовое обучение (архитектура, раздел 2).
-const REF_DISCOUNT = 200_000;
+// Скидка по агентской реф-ссылке — 10% на базовое обучение. Была фиксированной
+// (200к), начальник перевёл на процент (пак D, пункт 2).
+const REF_DISCOUNT_RATE = 0.1;
 
 async function requireStaff(): Promise<AppUser> {
   const user = await getAppUser();
@@ -223,19 +224,22 @@ export async function recordClientAction(
     return { error: "Абонемент оформляется через «Продажу абонемента»." };
   }
 
-  // Чек. Скидка −200к действует только по коду АГЕНТА и только на базовое
+  // Чек. Скидка −10% действует только по коду АГЕНТА и только на базовое
   // обучение. Личный код инструктора (c2) в booking.ref_code скидку НЕ даёт —
   // поэтому завязываемся на распознанного агента, а не на сам факт ref_code.
   let amount = Number(service.price ?? 0);
   const discounted = Boolean(agent) && service.category === "training";
-  if (discounted) amount = Math.max(0, amount - REF_DISCOUNT);
+  if (discounted) amount = Math.max(0, amount - Math.round(amount * REF_DISCOUNT_RATE));
 
+  // Комиссию агента фиксируем на сессии: из неё вычтется база инструктора
+  // (15% с чека минус комиссия). См. миграцию 0021.
   const { error: sessionError } = await supabase.from("sessions").insert({
     client_id: clientId,
     service_id: service.id,
     instructor_id: user.id,
     date,
     amount,
+    agent_commission: agent ? agent.commission_fixed : 0,
     payment_method_id: paymentMethodId,
     created_by: user.id,
   });

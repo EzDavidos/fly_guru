@@ -267,9 +267,11 @@ async function resolveClient(
   return { id: created.id };
 }
 
-// Скидка по агентской реф-ссылке — 200 000 ₫ на базовое обучение (как в
-// кабинете инструктора). Применяется, когда админ записывает клиента из заявки.
-const REF_DISCOUNT = 200_000;
+// Скидка по агентской реф-ссылке — 10% на базовое обучение (как в кабинете
+// инструктора). Применяется, когда админ записывает клиента из заявки.
+// Раньше была фиксированной суммой (200к); начальник перевёл на процент, чтобы
+// скидка соразмерялась с ценой услуги (пак D, пункт 2).
+const REF_DISCOUNT_RATE = 0.1;
 
 // Создать сессию задним числом: инструктор забыл оформить занятие — админ
 // вносит его вручную на любую дату. Тем же экшеном пользуется админская
@@ -343,7 +345,7 @@ export async function createSessionAction(
   if ("error" in clientRes) return clientRes;
   const clientId = clientRes.id;
 
-  // Пустая сумма = по прайсу (с агентской скидкой −200к на базовое обучение);
+  // Пустая сумма = по прайсу (с агентской скидкой −10% на базовое обучение);
   // введённая вручную — важнее (админ решает: скидки, брони, доплаты).
   const amountRaw = String(formData.get("amount") ?? "").trim();
   let amount: number | null;
@@ -352,7 +354,7 @@ export async function createSessionAction(
   } else {
     amount = Number(service.price ?? 0);
     if (agent && service.category === "training") {
-      amount = Math.max(0, amount - REF_DISCOUNT);
+      amount = Math.max(0, amount - Math.round(amount * REF_DISCOUNT_RATE));
     }
   }
   if (amount === null) return { error: "Сумма — число в донгах, например 1 500 000." };
@@ -362,12 +364,16 @@ export async function createSessionAction(
   const paymentMethodId = String(formData.get("paymentMethodId") ?? "").trim();
   if (!paymentMethodId) return { error: "Укажите формат оплаты." };
 
+  // Комиссию агента фиксируем на сессии — из неё вычтется база инструктора
+  // (15% с чека минус комиссия). Ставим её при любом агентском занятии, даже
+  // если сумму админ ввёл руками: агент привёл клиента независимо от чека.
   const { error: insError } = await supabase.from("sessions").insert({
     client_id: clientId,
     service_id: serviceId,
     instructor_id: instructorId,
     date,
     amount,
+    agent_commission: agent ? agent.commission_fixed : 0,
     payment_method_id: paymentMethodId,
     created_by: admin.id,
   });

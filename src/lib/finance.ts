@@ -47,6 +47,7 @@ export interface Finance {
   instructorShiftPay: number; // 200 000 ₫ × выходы инструкторов
   instructorSubsPay: number; // 15% с абонементов, проданных инструкторами
   instructorShifts: number; // сколько выходов оплачиваем
+  agentCommissions: number; // комиссии агентов по сессиям периода (пак D)
   crmCut: number; // 2% с сессий + абонементов
   crmEach: number; // доля одного (Дэвид / Ромчик) — половина crmCut
   autoTotal: number; // сумма основных (авто) расходов
@@ -63,7 +64,7 @@ export async function getFinance(
     await Promise.all([
       supabase
         .from("sessions")
-        .select("amount, instructor_id")
+        .select("amount, agent_commission, instructor_id")
         .gte("date", range.fromDay)
         .lt("date", range.toDay),
       supabase
@@ -97,9 +98,24 @@ export async function getFinance(
   // Выручка школы — вся; а вот ЗП платим только за работу инструкторов.
   // Всё, что откатал/продал сам админ, мимо ЗП — это его прибыль.
   const isInstructor = new Set(instructorIds);
-  const instructorSessionsRevenue = sessions
-    .filter((r) => r.instructor_id && isInstructor.has(r.instructor_id as string))
-    .reduce((s, r) => s + Number(r.amount ?? 0), 0);
+  const instructorSessions = sessions.filter(
+    (r) => r.instructor_id && isInstructor.has(r.instructor_id as string),
+  );
+  const instructorSessionsRevenue = instructorSessions.reduce(
+    (s, r) => s + Number(r.amount ?? 0),
+    0,
+  );
+  // Комиссия агентов по сессиям инструкторов — вычитается из базы их 15% (пак D).
+  const instructorSessionsCommission = instructorSessions.reduce(
+    (s, r) => s + Number(r.agent_commission ?? 0),
+    0,
+  );
+  // Все комиссии агентов за период — отдельная статья расхода школы: агент
+  // забирает их «сверху» чека, из прибыли босса это надо вычесть.
+  const agentCommissions = sessions.reduce(
+    (s, r) => s + Number(r.agent_commission ?? 0),
+    0,
+  );
   const instructorSubsRevenue = subs
     .filter((r) => r.sold_by && isInstructor.has(r.sold_by as string))
     .reduce((s, r) => s + Number(r.price ?? 0), 0);
@@ -108,13 +124,15 @@ export async function getFinance(
   ).length;
 
   const marina = revenue * MARINA_RATE;
-  const instructorSessionPay = instructorSessionsRevenue * SESSION_RATE;
+  const instructorSessionPay =
+    Math.max(0, instructorSessionsRevenue - instructorSessionsCommission) *
+    SESSION_RATE;
   const instructorShiftPay = instructorShifts * SHIFT_PAY;
   const instructorSubsPay = instructorSubsRevenue * SUBS_RATE;
   const instructorPay = instructorSessionPay + instructorShiftPay + instructorSubsPay;
   const crmCut = revenue * CRM_RATE;
   const crmEach = crmCut / 2;
-  const autoTotal = marina + instructorPay + crmCut;
+  const autoTotal = marina + instructorPay + agentCommissions + crmCut;
 
   const manualExpenses = (expensesRes.data ?? []).map((e) => ({
     id: e.id as string,
@@ -138,6 +156,7 @@ export async function getFinance(
     instructorShiftPay,
     instructorSubsPay,
     instructorShifts,
+    agentCommissions,
     crmCut,
     crmEach,
     autoTotal,

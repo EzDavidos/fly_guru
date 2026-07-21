@@ -72,6 +72,7 @@ export async function getInstructorIds(supabase: Supabase): Promise<string[]> {
 interface SessionRow {
   client_id: string | null;
   amount: number | null;
+  agent_commission: number | null;
   minutes_used: number | null;
   clients: { name: string } | null;
   services: { category: string } | null;
@@ -86,13 +87,18 @@ export async function getInstructorStats(
   // Мои сессии за период. RLS отдаёт ещё и чужие списания — фильтруем явно.
   const { data } = await supabase
     .from("sessions")
-    .select("client_id, amount, minutes_used, clients(name), services(category)")
+    .select(
+      "client_id, amount, agent_commission, minutes_used, clients(name), services(category)",
+    )
     .eq("instructor_id", instructorId)
     .gte("date", range.fromDay)
     .lt("date", range.toDay);
   const rows = (data ?? []) as unknown as SessionRow[];
 
   const revenue = rows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
+  // Комиссия агентов по моим сессиям: её вычитаем из базы 15% (пак D). Агент
+  // забирает свои 300к «сверху» — инструктору с них ничего не идёт.
+  const agentCommission = rows.reduce((s, r) => s + Number(r.agent_commission ?? 0), 0);
   const minutesWrittenOff = rows.reduce((s, r) => s + (r.minutes_used ?? 0), 0);
   const paidSessions = rows.filter((r) => Number(r.amount ?? 0) > 0);
 
@@ -162,7 +168,10 @@ export async function getInstructorStats(
 
   const shiftsCount = shiftsRaw ?? 0;
   const isInstructor = role === "instructor"; // у босса ЗП нет — все слагаемые нули
-  const salaryFromSessions = isInstructor ? revenue * SESSION_RATE : 0;
+  // База = чеки моих сессий МИНУС комиссии агентов по ним (пак D).
+  const salaryFromSessions = isInstructor
+    ? Math.max(0, revenue - agentCommission) * SESSION_RATE
+    : 0;
   const salaryFromShifts = isInstructor ? shiftsCount * SHIFT_PAY : 0;
   const salaryFromSubs =
     isInstructor && instructorIds.length > 0 ? subsPool / instructorIds.length : 0;
