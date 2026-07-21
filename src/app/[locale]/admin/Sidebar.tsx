@@ -5,28 +5,33 @@ import Image from "next/image";
 import { Link, usePathname } from "@/i18n/navigation";
 import { logoutAction } from "../login/actions";
 
-// Боковое меню админки. На ПК — узкая колонка слева (sticky), на телефоне
-// сворачивается в верхнюю плашку «текущий блок ▸ Меню», тап разворачивает
-// список. Активный блок подсвечивается (сравниваем с usePathname).
+// Боковое меню админки. На ПК — узкая колонка слева (sticky). На телефоне —
+// фиксированная нижняя панель с 4 главными разделами + «Ещё» (лист со всеми
+// остальными). Активный блок подсвечивается (сравниваем с usePathname).
+//
+// primary — раздел выносится в нижнюю панель на телефоне; short — короткая
+// подпись для узкой ячейки этой панели.
 
 type NavItem = {
   href: string;
   label: string;
+  short?: string;
   hint?: string;
+  primary?: boolean;
   badge?: number;
 };
 
 const NAV: NavItem[] = [
-  { href: "/admin/bookings", label: "Заявки", hint: "актуальные" },
-  { href: "/admin/record", label: "Записать клиента", hint: "провести занятие" },
-  { href: "/admin/calendar", label: "Календарь", hint: "смены · записи по дням" },
+  { href: "/admin/bookings", label: "Заявки", hint: "актуальные", primary: true },
+  { href: "/admin/record", label: "Записать клиента", short: "Записать", hint: "провести занятие", primary: true },
+  { href: "/admin/calendar", label: "Календарь", hint: "смены · записи по дням", primary: true },
   { href: "/admin/sessions", label: "Сессии", hint: "занятия · задним числом" },
   { href: "/admin/subscriptions", label: "Абонементы", hint: "оплаты · минуты" },
   { href: "/admin/clients", label: "Клиенты", hint: "поиск · карточки" },
   { href: "/admin/agents", label: "Агенты", hint: "реф-ссылки · награды" },
   { href: "/admin/members", label: "Члены клуба", hint: "инвайты · кабинеты" },
   { href: "/admin/materials", label: "Материалы", hint: "ссылки для рекламы" },
-  { href: "/admin/dashboard", label: "Статистика", hint: "месяц цифрами" },
+  { href: "/admin/dashboard", label: "Статистика", hint: "месяц цифрами", primary: true },
   { href: "/admin/payroll", label: "Расчёт месяца", hint: "ЗП · агенты · CSV" },
   { href: "/admin/expenses", label: "Расходы", hint: "марина · зп · прочее" },
   { href: "/admin/services", label: "Услуги", hint: "цены · справочник" },
@@ -63,6 +68,10 @@ export function Sidebar({
   );
   const active =
     withBadges.find((item) => pathname.startsWith(item.href)) ?? withBadges[0];
+  // Нижняя панель телефона: главные разделы + «Ещё». «Ещё» подсвечиваем, когда
+  // открыт раздел не из панели (или лист развёрнут).
+  const primaryItems = withBadges.filter((item) => item.primary);
+  const moreActive = !primaryItems.some((item) => pathname.startsWith(item.href));
 
   const profile = (
     <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-line bg-surface p-4">
@@ -138,27 +147,59 @@ export function Sidebar({
         {links}
       </div>
 
-      {/* Телефон: плашка текущего блока + разворачиваемое меню */}
+      {/* Телефон: фиксированная нижняя панель + выезжающий лист «Ещё» */}
       <div className="md:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3 text-left"
-        >
-          <span className="flex items-center gap-2 font-semibold">
-            {active.label}
-            {active.badge ? <CountBubble count={active.badge} /> : null}
-          </span>
-          <span className="flex items-center gap-1 text-sm font-semibold text-primary">
-            Меню <span aria-hidden>{open ? "▲" : "▼"}</span>
-          </span>
-        </button>
         {open && (
-          <div className="mt-2 space-y-3">
-            {profile}
-            {links}
-          </div>
+          <>
+            <button
+              type="button"
+              aria-label="Закрыть меню"
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 bg-black/40"
+            />
+            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[80dvh] space-y-3 overflow-y-auto rounded-t-2xl border-t border-line bg-bg p-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+              {profile}
+              {links}
+            </div>
+          </>
         )}
+
+        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
+          {primaryItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                aria-current={isActive ? "page" : undefined}
+                className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${
+                  isActive ? "text-primary" : "text-muted"
+                }`}
+              >
+                <span className="max-w-full truncate px-1">{item.short ?? item.label}</span>
+                {item.badge ? (
+                  <span className="absolute right-[22%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {item.badge}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${
+              moreActive || open ? "text-primary" : "text-muted"
+            }`}
+          >
+            <span aria-hidden className="text-base leading-none">
+              ☰
+            </span>
+            Ещё
+          </button>
+        </nav>
       </div>
     </aside>
   );

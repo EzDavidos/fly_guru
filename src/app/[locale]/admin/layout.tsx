@@ -48,8 +48,8 @@ export default async function AdminLayout({
     // На ПК — app-shell: область кабинета фиксированной высоты (вьюпорт минус
     // шапка ~4rem), сайдбар и контент скроллятся независимо (крутится та
     // колонка, над которой мышь; левый бар не уезжает). На телефоне — обычный
-    // скролл страницы, меню сверху разворачивается.
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:h-[calc(100dvh-4rem)] md:py-0">
+    // скролл страницы, меню в фиксированной нижней панели (pb-24 под неё).
+    <div className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 md:h-[calc(100dvh-4rem)] md:py-0">
       <div className="md:flex md:h-full md:gap-6">
         <Sidebar
           name={user.name}
