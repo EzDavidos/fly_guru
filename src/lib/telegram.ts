@@ -70,6 +70,35 @@ export async function sendInstructorsBookingAlert(b: {
   await sendTelegram(chatId, lines.join("\n"));
 }
 
+// Напоминалка про смену в группу инструкторов (пак C). Конкретного человека не
+// тегаем — просто шлём ссылку на экран смены; кто на выходе, тот и откроет/
+// закроет. Крон дёргает это утром (open) и вечером (close).
+const SHIFT_URL = "https://www.flyguru.pro/instructor/shift";
+
+export async function sendShiftReminder(kind: "open" | "close"): Promise<void> {
+  const chatId = process.env.TELEGRAM_INSTRUCTORS_CHAT_ID;
+  if (!chatId) return; // группа ещё не подключена — тихо выходим
+
+  const text =
+    kind === "open"
+      ? [
+          "🌅 Открытие смены",
+          "",
+          "Кто сегодня на воде — откройте смену и сфотографируйте доску и крыло.",
+          "",
+          SHIFT_URL,
+        ].join("\n")
+      : [
+          "🌇 Закрытие смены",
+          "",
+          "Не забудьте закрыть смену и снова снять инвентарь — по вечерним фото видно, что изменилось за день.",
+          "",
+          SHIFT_URL,
+        ].join("\n");
+
+  await sendTelegram(chatId, text);
+}
+
 // Общая отправка простым текстом (без Markdown — надёжнее, ничего не надо
 // экранировать). Ошибки глотаем: уведомление — дополнение, не звено процесса.
 async function sendTelegram(chatId: string, text: string): Promise<void> {
