@@ -1,7 +1,19 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
-import { vnToday } from "@/lib/dates";
-import { getMonthCalendar, initials } from "@/lib/shifts";
+import { vnToday, vnTimeLabel } from "@/lib/dates";
+import {
+  getMonthCalendar,
+  initials,
+  loadShiftPhotos,
+  type ShiftPhoto,
+} from "@/lib/shifts";
+import {
+  shiftStatus,
+  OPEN_LABEL,
+  CLOSE_LABEL,
+  statusClass,
+} from "@/lib/shiftRules";
 import { MonthGrid } from "@/components/cabinet/MonthGrid";
 import { CalMonthNav, resolveCalYm } from "@/components/cabinet/CalMonthNav";
 import { assignShiftAction, removeShiftAction } from "../actions";
@@ -41,6 +53,13 @@ export default async function AdminCalendarPage({
   const shiftByInstr = new Map(
     (dayData?.shifts ?? []).map((s) => [s.instructorId, s]),
   );
+  // Фото смен выбранного дня (пак C): подтягиваем только для открытого дня.
+  const photosByShift: Map<string, ShiftPhoto[]> = selected
+    ? await loadShiftPhotos(
+        supabase,
+        (dayData?.shifts ?? []).map((s) => s.id),
+      )
+    : new Map();
 
   return (
     <div>
@@ -95,46 +114,125 @@ export default async function AdminCalendarPage({
           <div className="mt-2 space-y-2">
             {cal.staff.map((u) => {
               const shift = shiftByInstr.get(u.id);
+              const status = shift
+                ? shiftStatus(shift.openedAt, shift.closedAt)
+                : null;
+              const photos = shift
+                ? (photosByShift.get(shift.id) ?? [])
+                : [];
               return (
                 <div
                   key={u.id}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-line/70 px-3 py-2"
+                  className="rounded-xl border border-line/70 px-3 py-2"
                 >
-                  <span className="min-w-0 text-sm font-semibold">
-                    {shift && <span className="text-accent-strong">🏄 </span>}
-                    {u.name}
-                    {shift?.note && (
-                      <span className="font-normal text-muted"> · {shift.note}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 text-sm font-semibold">
+                      {shift && <span className="text-accent-strong">🏄 </span>}
+                      {u.name}
+                      {shift && !shift.planned && (
+                        <span className="font-normal text-muted"> · без плана</span>
+                      )}
+                      {shift?.note && (
+                        <span className="font-normal text-muted"> · {shift.note}</span>
+                      )}
+                    </span>
+                    {shift ? (
+                      <form action={removeShiftAction} className="shrink-0">
+                        <input type="hidden" name="instructorId" value={u.id} />
+                        <input type="hidden" name="date" value={selected} />
+                        <button
+                          type="submit"
+                          className="text-xs font-semibold text-muted transition-colors hover:text-red-500"
+                        >
+                          Убрать
+                        </button>
+                      </form>
+                    ) : (
+                      <form action={assignShiftAction} className="flex shrink-0 items-center gap-1.5">
+                        <input type="hidden" name="instructorId" value={u.id} />
+                        <input type="hidden" name="date" value={selected} />
+                        <input
+                          type="text"
+                          name="note"
+                          placeholder="заметка"
+                          className="w-24 rounded-lg border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-primary"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90"
+                        >
+                          Смена
+                        </button>
+                      </form>
                     )}
-                  </span>
-                  {shift ? (
-                    <form action={removeShiftAction} className="shrink-0">
-                      <input type="hidden" name="instructorId" value={u.id} />
-                      <input type="hidden" name="date" value={selected} />
-                      <button
-                        type="submit"
-                        className="text-xs font-semibold text-muted transition-colors hover:text-red-500"
-                      >
-                        Убрать
-                      </button>
-                    </form>
-                  ) : (
-                    <form action={assignShiftAction} className="flex shrink-0 items-center gap-1.5">
-                      <input type="hidden" name="instructorId" value={u.id} />
-                      <input type="hidden" name="date" value={selected} />
-                      <input
-                        type="text"
-                        name="note"
-                        placeholder="заметка"
-                        className="w-24 rounded-lg border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-primary"
-                      />
-                      <button
-                        type="submit"
-                        className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90"
-                      >
-                        Смена
-                      </button>
-                    </form>
+                  </div>
+
+                  {/* Факт выхода: во сколько открыл/закрыл и статус */}
+                  {status && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {shift!.openedAt ? (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusClass(
+                            status.open === "late",
+                          )}`}
+                        >
+                          открыл {vnTimeLabel(shift!.openedAt)} · {OPEN_LABEL[status.open]}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-line/40 px-2 py-0.5 text-[11px] font-semibold text-muted">
+                          не открыл
+                        </span>
+                      )}
+                      {shift!.closedAt ? (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusClass(
+                            status.close === "early",
+                          )}`}
+                        >
+                          закрыл {vnTimeLabel(shift!.closedAt)} · {CLOSE_LABEL[status.close]}
+                        </span>
+                      ) : shift!.openedAt ? (
+                        <span className="rounded-full bg-line/40 px-2 py-0.5 text-[11px] font-semibold text-muted">
+                          не закрыл
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {(shift?.openComment || shift?.closeComment) && (
+                    <p className="mt-1 text-xs text-muted">
+                      {shift.openComment && <>Открытие: {shift.openComment}. </>}
+                      {shift.closeComment && <>Закрытие: {shift.closeComment}.</>}
+                    </p>
+                  )}
+
+                  {/* Фото смены: открытие и закрытие */}
+                  {photos.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {photos.map((p) => (
+                        <a
+                          key={p.id}
+                          href={p.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative block"
+                          title={`${p.phase === "open" ? "Открытие" : "Закрытие"} · ${
+                            p.equipmentName ?? p.kind
+                          }`}
+                        >
+                          <Image
+                            src={p.url}
+                            alt={p.equipmentName ?? p.kind}
+                            width={64}
+                            height={64}
+                            className="h-16 w-16 rounded-lg object-cover"
+                          />
+                          <span className="absolute left-0 top-0 rounded-br-lg rounded-tl-lg bg-black/55 px-1 text-[9px] font-bold text-white">
+                            {p.phase === "open" ? "утро" : "вечер"}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
                   )}
                 </div>
               );
