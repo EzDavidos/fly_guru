@@ -22,6 +22,7 @@ interface AgentRow {
 interface AgentStats {
   visits: number;
   clients: number;
+  bookedOnly: number; // заполнили заявку, но до оплаты не дошли (пак D, пункт 1)
   pendingCount: number;
   pendingSum: number;
   confirmedCount: number;
@@ -31,6 +32,7 @@ interface AgentStats {
 const EMPTY_STATS: AgentStats = {
   visits: 0,
   clients: 0,
+  bookedOnly: 0,
   pendingCount: 0,
   pendingSum: 0,
   confirmedCount: 0,
@@ -79,6 +81,20 @@ function AgentCard({ a, stats }: { a: AgentRow; stats: AgentStats }) {
           ))}
         </div>
 
+        {/* Дошли до оплаты vs застряли на заявке (пак D, пункт 1) */}
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <div className="rounded-xl border border-line/70 p-2">
+            <p className="text-lg font-bold text-primary">
+              {stats.confirmedCount + stats.pendingCount}
+            </p>
+            <p className="text-[11px] text-muted">Оплатили</p>
+          </div>
+          <div className="rounded-xl border border-line/70 p-2">
+            <p className="text-lg font-bold">{stats.bookedOnly}</p>
+            <p className="text-[11px] text-muted">Только заявка</p>
+          </div>
+        </div>
+
         <div className="space-y-0.5 text-sm text-muted">
           {a.user?.phone && (
             <p>
@@ -124,7 +140,7 @@ export default async function AdminAgentsPage() {
 
   // Метрики тремя запросами на всех агентов сразу (не по одному на карточку),
   // агрегация в JS — на масштабе школы это дешевле и проще group by.
-  const [visitsRes, clientsRes, rewardsRes] = await Promise.all([
+  const [visitsRes, clientsRes, rewardsRes, bookingsRes] = await Promise.all([
     supabase.from("ref_visits").select("code").limit(100000),
     supabase
       .from("clients")
@@ -134,6 +150,14 @@ export default async function AdminAgentsPage() {
       .from("referral_rewards")
       .select("referrer_id, amount, status")
       .eq("referrer_type", "agent"),
+    // Заявки по агентским кодам: те, что «застряли» на форме (new/confirmed) и не
+    // дошли до оплаты, — это «только заявка». Done уже стали сессией (= оплата,
+    // видна в наградах), cancelled отброшены.
+    supabase
+      .from("bookings")
+      .select("ref_code, status")
+      .not("ref_code", "is", null)
+      .in("status", ["new", "confirmed"]),
   ]);
 
   const statsById = new Map<string, AgentStats>();
@@ -150,6 +174,12 @@ export default async function AdminAgentsPage() {
   for (const v of visitsRes.data ?? []) {
     const id = idByCode.get(v.code as string);
     if (id) stat(id).visits += 1;
+  }
+  for (const b of bookingsRes.data ?? []) {
+    // Код заявки может быть и личным кодом инструктора — тогда idByCode его не
+    // найдёт, и заявка справедливо не ляжет ни на какого агента.
+    const id = idByCode.get(b.ref_code as string);
+    if (id) stat(id).bookedOnly += 1;
   }
   for (const c of clientsRes.data ?? []) {
     if (c.referrer_id) stat(c.referrer_id as string).clients += 1;
