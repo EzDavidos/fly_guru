@@ -100,11 +100,10 @@ export default async function StatsPage({
         </Link>
       </div>
 
-      {/* flex-wrap + min-w на датах: нативный датапикер не сжимается ниже своей
-          ширины, без переноса на телефоне поля налезали друг на друга и на
-          кнопку. Кнопка на узком экране — отдельной строкой на всю ширину. */}
-      <form className="mt-3 flex flex-wrap items-end gap-2" action="">
-        <label className="min-w-[7.5rem] flex-1 text-xs text-muted">
+      {/* На телефоне поля дат — в столбик (нативный датапикер не сжимается и
+          парой вылезал за экран, сдвигая страницу вбок). В строку — с sm. */}
+      <form className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end" action="">
+        <label className="min-w-0 text-xs text-muted sm:flex-1">
           С
           <input
             type="date"
@@ -114,7 +113,7 @@ export default async function StatsPage({
             className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
           />
         </label>
-        <label className="min-w-[7.5rem] flex-1 text-xs text-muted">
+        <label className="min-w-0 text-xs text-muted sm:flex-1">
           По
           <input
             type="date"

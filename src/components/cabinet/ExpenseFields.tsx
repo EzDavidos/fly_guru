@@ -32,7 +32,7 @@ export function ExpenseFields({
   return (
     <form action={formAction}>
       <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs text-muted">
+        <label className="min-w-0 text-xs text-muted">
           Дата
           <input
             type="date"
@@ -41,7 +41,7 @@ export function ExpenseFields({
             className={`mt-1 ${inputClass}`}
           />
         </label>
-        <label className="text-xs text-muted">
+        <label className="min-w-0 text-xs text-muted">
           Сумма, ₫
           <input
             type="text"
