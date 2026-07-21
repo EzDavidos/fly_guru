@@ -13,8 +13,11 @@ import type { ActionState } from "@/app/[locale]/instructor/actions";
 // обязательна). Дата по умолчанию — сегодня, приходит с сервера, чтобы
 // совпадала с часовым поясом школы.
 
+// Единая высота h-10 у всех полей формы — иначе нативный <input type="date">
+// рендерится другой высоты, чем текстовые поля/селекты, и строка «дата+сумма»
+// стоит на разных уровнях.
 const fieldBase =
-  "rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
+  "h-10 rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-primary";
 // Категория/комментарий — на всю ширину; дата/сумма задают ширину сами.
 const inputClass = `w-full ${fieldBase}`;
 
@@ -34,9 +37,9 @@ export function ExpenseFields({
   return (
     <form action={formAction}>
       {/* Дата (компактная, как в статистике) и Сумма (прежней ширины) стоят
-          рядом и по центру. Без w-full, иначе нативный датапикер растягивается
-          и налезает на сумму. */}
-      <div className="flex items-end justify-center gap-2">
+          рядом, выровнены влево как остальные поля панели, одной высоты. Без
+          w-full, иначе нативный датапикер растягивается и налезает на сумму. */}
+      <div className="flex items-end gap-2">
         <label className="flex flex-col items-start text-xs text-muted">
           Дата
           <input

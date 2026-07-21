@@ -27,8 +27,10 @@ export interface RecordPrefill {
   date?: string; // дата из заявки — на неё и ляжет занятие
 }
 
+// Единая высота h-10 у всех полей — иначе нативный <input type="date"> в паре
+// с селектом «Инструктор» стоит на другом уровне (см. ExpenseFields).
 const inputClass =
-  "w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
+  "w-full h-10 rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-primary";
 
 export function RecordClientForm({
   services,
