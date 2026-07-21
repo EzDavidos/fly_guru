@@ -653,10 +653,16 @@ export async function lookupClientByPhoneAction(phone: string): Promise<ClientHi
 // server action 5 МБ (next.config.ts), а доска + крыло + связь + дефекты в
 // одном POST его пробьют. Первый снимок дня заводит смену на лету.
 //
-// Разделение клиентов: строки shifts/shift_photos пишем ПОД ПОЛЬЗОВАТЕЛЕМ —
-// RLS (shifts_*_own, shift_photos_*_own из 0019) сам не даст подшить фото к
-// чужому дню. А в Storage у бакета shifts политик записи нет (как у avatars и
-// clients), поэтому файл кладём service_role-клиентом.
+// Разделение клиентов (по ревью безопасности, миграция 0020):
+//  • сама СМЕНА (opened_at/closed_at/planned) пишется ТОЛЬКО под service_role.
+//    RLS не ограничивает набор колонок, поэтому политика «правь свою строку»
+//    позволяла инструктору выставить opened_at на 08:00 или planned=true
+//    запросом к PostgREST мимо UI. Метку времени теперь ставит сервер, а роль
+//    и владельца проверяет код — подделать нельзя;
+//  • ФОТО (shift_photos) инструктор пишет под собой — RLS shift_photos_*_own
+//    даёт привязать снимок только к своей смене, подделывать там нечего;
+//  • файл в Storage кладёт service_role: у бакета shifts нет политик записи
+//    (как у avatars и clients).
 
 const PHOTO_PHASES = ["open", "close"] as const;
 const PHOTO_KINDS = ["board", "wing", "comms", "extra"] as const;
@@ -665,12 +671,15 @@ type PhotoKind = (typeof PHOTO_KINDS)[number];
 
 // Смена инструктора на сегодня; заводим на лету, если её нет. Незапланированный
 // выход помечаем planned=false — босс отличит его от согласованной смены.
+// Пишем service_role-клиентом (см. блок выше): прямую запись в shifts у
+// инструктора отобрали в 0020, а владельца — instructor_id = свой id — задаёт
+// сам код, из формы это поле не приходит.
 async function ensureTodayShift(
-  supabase: Awaited<ReturnType<typeof createClient>>,
   user: AppUser,
 ): Promise<{ id: string; openedAt: string | null; closedAt: string | null } | { error: string }> {
+  const admin = createAdminClient();
   const date = vnToday();
-  const { data: existing } = await supabase
+  const { data: existing } = await admin
     .from("shifts")
     .select("id, opened_at, closed_at")
     .eq("instructor_id", user.id)
@@ -684,7 +693,7 @@ async function ensureTodayShift(
     };
   }
 
-  const { data: created, error } = await supabase
+  const { data: created, error } = await admin
     .from("shifts")
     .insert({ instructor_id: user.id, date, planned: false, created_by: user.id })
     .select("id, opened_at, closed_at")
@@ -693,7 +702,7 @@ async function ensureTodayShift(
     // 23505 = смену только что завёл параллельный запрос (двойной тап) —
     // перечитываем существующую, это не ошибка.
     if (error?.code === "23505") {
-      const { data: again } = await supabase
+      const { data: again } = await admin
         .from("shifts")
         .select("id, opened_at, closed_at")
         .eq("instructor_id", user.id)
@@ -742,7 +751,7 @@ export async function addShiftPhotoAction(
   if (checked.error) return { error: checked.error };
 
   const supabase = await createClient();
-  const shift = await ensureTodayShift(supabase, user);
+  const shift = await ensureTodayShift(user);
   if ("error" in shift) return { error: shift.error };
 
   // Фазу нельзя доснимать после того, как она завершена: открытие — пока смена
@@ -855,18 +864,22 @@ export async function openShiftAction(
   if (user.role !== "instructor") return { error: "Смены открывают инструкторы." };
 
   const supabase = await createClient();
-  const shift = await ensureTodayShift(supabase, user);
+  const shift = await ensureTodayShift(user);
   if ("error" in shift) return { error: shift.error };
   if (shift.openedAt) return { error: "Смена уже открыта." };
 
   const missing = await requireBoardAndWing(supabase, shift.id, "open");
   if (missing) return { error: missing };
 
+  // opened_at ставит СЕРВЕР (не клиент) и пишет service_role — подделать
+  // «вовремя» нельзя (0020).
   const comment = String(formData.get("comment") ?? "").trim() || null;
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("shifts")
     .update({ opened_at: new Date().toISOString(), open_comment: comment })
-    .eq("id", shift.id);
+    .eq("id", shift.id)
+    .eq("instructor_id", user.id);
   if (error) return { error: `Не удалось открыть смену: ${error.message}` };
 
   revalidatePath("/instructor/shift");
@@ -895,11 +908,14 @@ export async function closeShiftAction(
   const missing = await requireBoardAndWing(supabase, shift.id as string, "close");
   if (missing) return { error: missing };
 
+  // closed_at ставит СЕРВЕР под service_role — та же защита, что и на открытии.
   const comment = String(formData.get("comment") ?? "").trim() || null;
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .from("shifts")
     .update({ closed_at: new Date().toISOString(), close_comment: comment })
-    .eq("id", shift.id);
+    .eq("id", shift.id)
+    .eq("instructor_id", user.id);
   if (error) return { error: `Не удалось закрыть смену: ${error.message}` };
 
   revalidatePath("/instructor/shift");
