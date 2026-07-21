@@ -60,7 +60,18 @@ export async function loginAction(
     return { error: "Неверный логин или пароль." };
   }
 
-  const role = (data.user.app_metadata?.role as AppRole | undefined) ?? null;
+  // Роль берём из БД (источник правды), а не из JWT: токен отстаёт, если роль
+  // сменили после его выдачи, и тогда вход кидал бы, например, повышенного до
+  // admin инструктора обратно в кабинет инструктора. JWT — только фолбэк.
+  const { data: dbUser } = await supabase
+    .from("users")
+    .select("role")
+    .eq("auth_id", data.user.id)
+    .maybeSingle();
+  const role =
+    (dbUser?.role as AppRole | undefined) ??
+    (data.user.app_metadata?.role as AppRole | undefined) ??
+    null;
   if (!role || !(role in ROLE_HOME)) {
     // Аккаунт есть в auth, но роль не проставлена — создан мимо скрипта.
     await supabase.auth.signOut();

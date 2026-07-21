@@ -67,7 +67,24 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const role = (user.app_metadata?.role as string | undefined) ?? "";
+  // Роль из JWT — быстрый кэш в токене. Она ОТСТАЁТ, если роль в таблице users
+  // сменили уже после выдачи токена (инструктора повысили до admin — а токен
+  // всё ещё instructor). Тогда middleware выгонял такого «админа» из /admin в
+  // /instructor, хотя страницы и RLS (они смотрят в БД) пускают его как админа.
+  let role = (user.app_metadata?.role as string | undefined) ?? "";
+
+  // Сверяемся с БД (источник правды) ТОЛЬКО когда JWT собрался отказать: на
+  // обычном входе (admin или совпадающая роль) запроса нет. users_select_own
+  // отдаёт свою строку клиенту, привязанному к кукам запроса.
+  if (role !== section && role !== "admin") {
+    const { data } = await supabase
+      .from("users")
+      .select("role")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+    role = (data?.role as string | undefined) ?? role;
+  }
+
   if (role !== section && role !== "admin") {
     // Чужой кабинет: отправляем в свой (или на логин, если роль не проставлена).
     const home = PROTECTED.has(role) ? `/${role}` : "/login";
