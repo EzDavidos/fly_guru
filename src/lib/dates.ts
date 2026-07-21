@@ -101,3 +101,24 @@ export function subscriptionExpiry(from: Date = new Date()): Date {
   d.setUTCMonth(d.getUTCMonth() + 3);
   return d;
 }
+
+// Час и минута момента по времени Нячанга. Нужны правилам смены (пак C):
+// «открыл до 9:00» и «закрыл после 18:00» считаются по местным часам, а не по
+// UTC сервера — иначе граница уезжала бы на семь часов.
+export function vnClock(iso: string | Date): { hour: number; minute: number } {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  const local = new Date(d.getTime() + VN_OFFSET_MS);
+  return { hour: local.getUTCHours(), minute: local.getUTCMinutes() };
+}
+
+// «08:42» по Нячангу — для показа времени открытия/закрытия смены.
+export function vnTimeLabel(iso: string | Date | null): string {
+  if (!iso) return "—";
+  const { hour, minute } = vnClock(iso);
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+// Текущий час по Нячангу — крону надо понять, утро сейчас или вечер.
+export function vnHourNow(): number {
+  return vnClock(new Date()).hour;
+}

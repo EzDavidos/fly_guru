@@ -13,6 +13,39 @@ export interface ShiftEntry {
   instructorId: string;
   name: string;
   note: string | null;
+  // Факт выхода (пак C). null — смена запланирована, но инструктор её ещё не
+  // открыл/закрыл.
+  planned: boolean;
+  openedAt: string | null;
+  closedAt: string | null;
+  openComment: string | null;
+  closeComment: string | null;
+}
+
+export type PhotoPhase = "open" | "close";
+export type PhotoKind = "board" | "wing" | "comms" | "extra";
+
+export interface ShiftPhoto {
+  id: string;
+  phase: PhotoPhase;
+  kind: PhotoKind;
+  equipmentId: string | null;
+  equipmentName: string | null;
+  path: string;
+  url: string;
+}
+
+// Смена инструктора на конкретный день с фактом и фотографиями — источник для
+// экрана «Смена» в кабинете.
+export interface InstructorShift {
+  id: string;
+  date: string;
+  planned: boolean;
+  openedAt: string | null;
+  closedAt: string | null;
+  openComment: string | null;
+  closeComment: string | null;
+  photos: ShiftPhoto[];
 }
 
 export interface DayBooking {
@@ -49,7 +82,9 @@ export async function getMonthCalendar(
   const [shiftsRes, bookingsRes, staffRes] = await Promise.all([
     supabase
       .from("shifts")
-      .select("id, instructor_id, date, note, instructor:users!instructor_id(name)")
+      .select(
+        "id, instructor_id, date, note, planned, opened_at, closed_at, open_comment, close_comment, instructor:users!instructor_id(name)",
+      )
       .gte("date", fromDay)
       .lt("date", toDay),
     supabase
@@ -84,6 +119,11 @@ export async function getMonthCalendar(
       instructorId: s.instructor_id as string,
       name: instr?.name ?? "?",
       note: (s.note as string | null) ?? null,
+      planned: (s.planned as boolean | null) ?? true,
+      openedAt: (s.opened_at as string | null) ?? null,
+      closedAt: (s.closed_at as string | null) ?? null,
+      openComment: (s.open_comment as string | null) ?? null,
+      closeComment: (s.close_comment as string | null) ?? null,
     });
   }
 
@@ -105,6 +145,79 @@ export async function getMonthCalendar(
   }
 
   return { days, staff: (staffRes.data ?? []) as StaffMember[] };
+}
+
+// Фотографии смен по списку id — одним запросом (панель дня у админа
+// показывает несколько смен сразу). Отдаём картой shiftId → фото.
+export async function loadShiftPhotos(
+  supabase: Supabase,
+  shiftIds: string[],
+): Promise<Map<string, ShiftPhoto[]>> {
+  const map = new Map<string, ShiftPhoto[]>();
+  if (shiftIds.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from("shift_photos")
+    .select("id, shift_id, phase, kind, equipment_id, path, url, equipment(name)")
+    .in("shift_id", shiftIds)
+    .order("created_at");
+  if (error) {
+    console.error("[shifts] photos load error:", error.message);
+    return map;
+  }
+
+  for (const p of data ?? []) {
+    const equip = p.equipment as unknown as { name: string } | null;
+    const photo: ShiftPhoto = {
+      id: p.id as string,
+      phase: p.phase as PhotoPhase,
+      kind: p.kind as PhotoKind,
+      equipmentId: (p.equipment_id as string | null) ?? null,
+      equipmentName: equip?.name ?? null,
+      path: p.path as string,
+      url: p.url as string,
+    };
+    const sid = p.shift_id as string;
+    const list = map.get(sid);
+    if (list) list.push(photo);
+    else map.set(sid, [photo]);
+  }
+  return map;
+}
+
+// Смена инструктора на сегодня (или любой день) с фактом и фото — для экрана
+// «Смена». null, если инструктор ещё не открывал смену в этот день и админ её
+// не планировал (строки shifts просто нет).
+export async function getShiftForDay(
+  supabase: Supabase,
+  instructorId: string,
+  date: string,
+): Promise<InstructorShift | null> {
+  const { data: shift, error } = await supabase
+    .from("shifts")
+    .select(
+      "id, date, planned, opened_at, closed_at, open_comment, close_comment",
+    )
+    .eq("instructor_id", instructorId)
+    .eq("date", date)
+    .maybeSingle();
+  if (error) {
+    console.error("[shifts] day shift load error:", error.message);
+    return null;
+  }
+  if (!shift) return null;
+
+  const photos = await loadShiftPhotos(supabase, [shift.id as string]);
+  return {
+    id: shift.id as string,
+    date: shift.date as string,
+    planned: (shift.planned as boolean | null) ?? true,
+    openedAt: (shift.opened_at as string | null) ?? null,
+    closedAt: (shift.closed_at as string | null) ?? null,
+    openComment: (shift.open_comment as string | null) ?? null,
+    closeComment: (shift.close_comment as string | null) ?? null,
+    photos: photos.get(shift.id as string) ?? [],
+  };
 }
 
 // Инициалы для компактной ячейки календаря: «Иван Петров» → «ИП», «Денис» → «Д».

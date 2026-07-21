@@ -643,3 +643,265 @@ export async function lookupClientByPhoneAction(phone: string): Promise<ClientHi
     sessionsCount: sessions.length,
   };
 }
+
+// ── Смена: открытие, закрытие, фотофиксация (пачка №4, пак C, пункт 5) ────────
+// Договорённость с начальником: инструктор утром снимает доску и крыло, вечером
+// снова — по паре снимков видно, что за день изменилось (где случилась
+// поломка). Штрафов нет, задача — видимость для босса (см. shiftRules.ts).
+//
+// Фото грузим ПО ОДНОМУ (каждый снимок — свой запрос), а не пачкой: лимит тела
+// server action 5 МБ (next.config.ts), а доска + крыло + связь + дефекты в
+// одном POST его пробьют. Первый снимок дня заводит смену на лету.
+//
+// Разделение клиентов: строки shifts/shift_photos пишем ПОД ПОЛЬЗОВАТЕЛЕМ —
+// RLS (shifts_*_own, shift_photos_*_own из 0019) сам не даст подшить фото к
+// чужому дню. А в Storage у бакета shifts политик записи нет (как у avatars и
+// clients), поэтому файл кладём service_role-клиентом.
+
+const PHOTO_PHASES = ["open", "close"] as const;
+const PHOTO_KINDS = ["board", "wing", "comms", "extra"] as const;
+type PhotoPhase = (typeof PHOTO_PHASES)[number];
+type PhotoKind = (typeof PHOTO_KINDS)[number];
+
+// Смена инструктора на сегодня; заводим на лету, если её нет. Незапланированный
+// выход помечаем planned=false — босс отличит его от согласованной смены.
+async function ensureTodayShift(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: AppUser,
+): Promise<{ id: string; openedAt: string | null; closedAt: string | null } | { error: string }> {
+  const date = vnToday();
+  const { data: existing } = await supabase
+    .from("shifts")
+    .select("id, opened_at, closed_at")
+    .eq("instructor_id", user.id)
+    .eq("date", date)
+    .maybeSingle();
+  if (existing) {
+    return {
+      id: existing.id as string,
+      openedAt: (existing.opened_at as string | null) ?? null,
+      closedAt: (existing.closed_at as string | null) ?? null,
+    };
+  }
+
+  const { data: created, error } = await supabase
+    .from("shifts")
+    .insert({ instructor_id: user.id, date, planned: false, created_by: user.id })
+    .select("id, opened_at, closed_at")
+    .single();
+  if (error || !created) {
+    // 23505 = смену только что завёл параллельный запрос (двойной тап) —
+    // перечитываем существующую, это не ошибка.
+    if (error?.code === "23505") {
+      const { data: again } = await supabase
+        .from("shifts")
+        .select("id, opened_at, closed_at")
+        .eq("instructor_id", user.id)
+        .eq("date", date)
+        .maybeSingle();
+      if (again) {
+        return {
+          id: again.id as string,
+          openedAt: (again.opened_at as string | null) ?? null,
+          closedAt: (again.closed_at as string | null) ?? null,
+        };
+      }
+    }
+    return { error: `Не удалось открыть смену: ${error?.message ?? "?"}` };
+  }
+  return { id: created.id as string, openedAt: null, closedAt: null };
+}
+
+// Добавить один снимок к смене. board/wing привязываются к единице инвентаря
+// (без неё по фото не понять, какая доска), comms/extra — свободные.
+export async function addShiftPhotoAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireStaff();
+  if (user.role !== "instructor") {
+    return { error: "Смены открывают инструкторы." };
+  }
+
+  const phase = String(formData.get("phase") ?? "") as PhotoPhase;
+  const kind = String(formData.get("kind") ?? "") as PhotoKind;
+  if (!PHOTO_PHASES.includes(phase) || !PHOTO_KINDS.includes(kind)) {
+    return { error: "Неизвестный тип снимка." };
+  }
+
+  const equipmentId = String(formData.get("equipmentId") ?? "").trim() || null;
+  if ((kind === "board" || kind === "wing") && !equipmentId) {
+    return { error: "Выберите, какую доску или крыло снимаете." };
+  }
+
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) {
+    return { error: "Сделайте снимок." };
+  }
+  const checked = checkPhoto(photo);
+  if (checked.error) return { error: checked.error };
+
+  const supabase = await createClient();
+  const shift = await ensureTodayShift(supabase, user);
+  if ("error" in shift) return { error: shift.error };
+
+  // Фазу нельзя доснимать после того, как она завершена: открытие — пока смена
+  // не открыта, закрытие — пока не закрыта (и только когда уже открыта).
+  if (phase === "open" && shift.openedAt) {
+    return { error: "Смена уже открыта — досъёмка утренних фото закрыта." };
+  }
+  if (phase === "close") {
+    if (!shift.openedAt) return { error: "Сначала откройте смену." };
+    if (shift.closedAt) return { error: "Смена уже закрыта." };
+  }
+
+  // Путь содержит id смены и uuid — снаружи не угадать; бакет публичный, как
+  // avatars/clients. Файл кладём service_role: на бакете shifts политик нет.
+  const path = `${shift.id}/${phase}-${kind}-${crypto.randomUUID()}.${checked.ext}`;
+  const admin = createAdminClient();
+  const { error: uploadError } = await admin.storage
+    .from("shifts")
+    .upload(path, photo, { contentType: photo.type });
+  if (uploadError) {
+    return { error: `Не удалось загрузить фото: ${uploadError.message}` };
+  }
+  const { data: pub } = admin.storage.from("shifts").getPublicUrl(path);
+
+  // Строку пишем под пользователем — RLS shift_photos_insert_own проверит, что
+  // смена его. created_by = user.id обязателен политикой.
+  const { error: rowError } = await supabase.from("shift_photos").insert({
+    shift_id: shift.id,
+    phase,
+    kind,
+    equipment_id: equipmentId,
+    path,
+    url: pub.publicUrl,
+    created_by: user.id,
+  });
+  if (rowError) {
+    // Файл уже в бакете — подчистим, чтобы не копить сирот (их и так снесёт
+    // чистилка через 3 дня, но лучше сразу).
+    await admin.storage.from("shifts").remove([path]);
+    return { error: `Не удалось сохранить снимок: ${rowError.message}` };
+  }
+
+  revalidatePath("/instructor/shift");
+  return { error: null };
+}
+
+// Убрать неудачный кадр (смазал — переснял). Только пока фаза не завершена.
+export async function deleteShiftPhotoAction(formData: FormData) {
+  const user = await requireStaff();
+  if (user.role !== "instructor") return;
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  // Читаем снимок вместе со статусом смены: RLS-select пускает инструктора к
+  // фото своих смен, поэтому чужой id вернёт пусто.
+  const { data: photo } = await supabase
+    .from("shift_photos")
+    .select("id, path, phase, shifts(opened_at, closed_at)")
+    .eq("id", id)
+    .maybeSingle();
+  if (!photo) return;
+
+  const shift = photo.shifts as unknown as {
+    opened_at: string | null;
+    closed_at: string | null;
+  } | null;
+  // Завершённую фазу не трогаем: утренние фото после открытия и вечерние после
+  // закрытия — уже зафиксированный факт.
+  if (photo.phase === "open" && shift?.opened_at) return;
+  if (photo.phase === "close" && shift?.closed_at) return;
+
+  const { error } = await supabase.from("shift_photos").delete().eq("id", id);
+  if (error) {
+    console.error("[instructor] shift photo delete error:", error.message);
+    return;
+  }
+  // Файл из бакета — service_role (политик записи на shifts нет).
+  const admin = createAdminClient();
+  await admin.storage.from("shifts").remove([photo.path as string]);
+
+  revalidatePath("/instructor/shift");
+}
+
+// Открытие смены обязательно требует пары «доска + крыло»: без них фотофиксация
+// бессмысленна (не с чем сравнить вечерние снимки). Комментарий необязателен —
+// это объяснение, почему открыл позже 9:00.
+async function requireBoardAndWing(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  shiftId: string,
+  phase: PhotoPhase,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("shift_photos")
+    .select("kind")
+    .eq("shift_id", shiftId)
+    .eq("phase", phase);
+  const kinds = new Set((data ?? []).map((p) => p.kind as string));
+  if (!kinds.has("board")) return "Сфотографируйте доску.";
+  if (!kinds.has("wing")) return "Сфотографируйте крыло.";
+  return null;
+}
+
+export async function openShiftAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireStaff();
+  if (user.role !== "instructor") return { error: "Смены открывают инструкторы." };
+
+  const supabase = await createClient();
+  const shift = await ensureTodayShift(supabase, user);
+  if ("error" in shift) return { error: shift.error };
+  if (shift.openedAt) return { error: "Смена уже открыта." };
+
+  const missing = await requireBoardAndWing(supabase, shift.id, "open");
+  if (missing) return { error: missing };
+
+  const comment = String(formData.get("comment") ?? "").trim() || null;
+  const { error } = await supabase
+    .from("shifts")
+    .update({ opened_at: new Date().toISOString(), open_comment: comment })
+    .eq("id", shift.id);
+  if (error) return { error: `Не удалось открыть смену: ${error.message}` };
+
+  revalidatePath("/instructor/shift");
+  return { error: null };
+}
+
+export async function closeShiftAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireStaff();
+  if (user.role !== "instructor") return { error: "Смены закрывают инструкторы." };
+
+  const supabase = await createClient();
+  const date = vnToday();
+  const { data: shift } = await supabase
+    .from("shifts")
+    .select("id, opened_at, closed_at")
+    .eq("instructor_id", user.id)
+    .eq("date", date)
+    .maybeSingle();
+  if (!shift) return { error: "Смена не открыта." };
+  if (!shift.opened_at) return { error: "Сначала откройте смену." };
+  if (shift.closed_at) return { error: "Смена уже закрыта." };
+
+  const missing = await requireBoardAndWing(supabase, shift.id as string, "close");
+  if (missing) return { error: missing };
+
+  const comment = String(formData.get("comment") ?? "").trim() || null;
+  const { error } = await supabase
+    .from("shifts")
+    .update({ closed_at: new Date().toISOString(), close_comment: comment })
+    .eq("id", shift.id);
+  if (error) return { error: `Не удалось закрыть смену: ${error.message}` };
+
+  revalidatePath("/instructor/shift");
+  return { error: null };
+}
