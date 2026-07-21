@@ -13,8 +13,10 @@ import type { ActionState } from "@/app/[locale]/instructor/actions";
 // обязательна). Дата по умолчанию — сегодня, приходит с сервера, чтобы
 // совпадала с часовым поясом школы.
 
-const inputClass =
-  "w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
+const fieldBase =
+  "rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
+// Категория/комментарий — на всю ширину; дата/сумма задают ширину сами.
+const inputClass = `w-full ${fieldBase}`;
 
 export function ExpenseFields({
   action,
@@ -31,17 +33,20 @@ export function ExpenseFields({
 
   return (
     <form action={formAction}>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="min-w-0 text-xs text-muted">
+      {/* Дата (компактная, как в статистике) и Сумма (прежней ширины) стоят
+          рядом и по центру. Без w-full, иначе нативный датапикер растягивается
+          и налезает на сумму. */}
+      <div className="flex items-end justify-center gap-2">
+        <label className="flex flex-col items-start text-xs text-muted">
           Дата
           <input
             type="date"
             name="date"
             defaultValue={today}
-            className={`mt-1 ${inputClass}`}
+            className={`mt-1 ${fieldBase}`}
           />
         </label>
-        <label className="min-w-0 text-xs text-muted">
+        <label className="flex flex-col items-start text-xs text-muted">
           Сумма, ₫
           <input
             type="text"
@@ -49,7 +54,7 @@ export function ExpenseFields({
             inputMode="numeric"
             required
             placeholder="1 500 000"
-            className={`mt-1 ${inputClass}`}
+            className={`mt-1 w-44 ${fieldBase}`}
           />
         </label>
       </div>

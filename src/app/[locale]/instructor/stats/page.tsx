@@ -100,32 +100,35 @@ export default async function StatsPage({
         </Link>
       </div>
 
-      {/* На телефоне поля дат — в столбик (нативный датапикер не сжимается и
-          парой вылезал за экран, сдвигая страницу вбок). В строку — с sm. */}
-      <form className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end" action="">
-        <label className="min-w-0 text-xs text-muted sm:flex-1">
-          С
-          <input
-            type="date"
-            name="from"
-            defaultValue={range.fromDay}
-            max={today}
-            className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-          />
-        </label>
-        <label className="min-w-0 text-xs text-muted sm:flex-1">
-          По
-          <input
-            type="date"
-            name="to"
-            defaultValue={lastDay}
-            max={today}
-            className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-          />
-        </label>
+      {/* Два компактных поля дат (по ширине почти как текст в них) стоят рядом
+          и по центру, кнопка «Показать» — под ними. Без w-full/flex-1, иначе
+          нативный датапикер растягивается и вылезает за экран. */}
+      <form className="mt-3 flex flex-col items-center gap-3" action="">
+        <div className="flex items-end gap-2">
+          <label className="flex flex-col items-start text-xs text-muted">
+            С
+            <input
+              type="date"
+              name="from"
+              defaultValue={range.fromDay}
+              max={today}
+              className="mt-1 rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <label className="flex flex-col items-start text-xs text-muted">
+            По
+            <input
+              type="date"
+              name="to"
+              defaultValue={lastDay}
+              max={today}
+              className="mt-1 rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+        </div>
         <button
           type="submit"
-          className="w-full rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white sm:w-auto"
+          className="rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
         >
           Показать
         </button>
