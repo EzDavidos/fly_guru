@@ -245,8 +245,10 @@ export async function recordClientAction(
   });
   if (sessionError) return { error: `Не удалось записать: ${sessionError.message}` };
 
-  // Награда агенту (pending — админ подтвердит на этапе 4). Комиссия считается
-  // от фактического чека, но размер награды фиксированный (commission_fixed).
+  // Награда агенту. Занятие проведено и оплачено прямо сейчас — это и есть
+  // подтверждение, поэтому пишем сразу `confirmed` (иначе награда зависала бы
+  // pending, клиент везде «оплатил», а в расчёте месяца агенту 0). Размер
+  // фиксированный (commission_fixed), считается независимо от чека.
   if (agent) {
     const { error: rewardError } = await supabase.from("referral_rewards").insert({
       referrer_type: "agent",
@@ -254,6 +256,8 @@ export async function recordClientAction(
       client_id: clientId,
       reward_type: "money",
       amount: agent.commission_fixed,
+      status: "confirmed",
+      confirmed_at: new Date().toISOString(),
     });
     if (rewardError) {
       // Сессия уже записана — не роняем оформление, но проговариваем проблему.
@@ -313,18 +317,9 @@ export async function sellSubscriptionAction(
   });
   if (subError) return { error: `Не удалось создать абонемент: ${subError.message}` };
 
-  // Первый абонемент делает клиента членом клуба.
-  const { data: membership } = await supabase
-    .from("memberships")
-    .select("id")
-    .eq("client_id", clientId)
-    .maybeSingle();
-  if (!membership) {
-    const { error: memError } = await supabase
-      .from("memberships")
-      .insert({ client_id: clientId });
-    if (memError) console.error("[instructor] membership insert error:", memError.message);
-  }
+  // Клуб пока не запускаем: продажа абонемента НЕ делает клиента членом клуба.
+  // Членство добавляется вручную на вкладке «Члены клуба» (вернём авто-выдачу,
+  // когда клуб оформим целиком).
 
   const params = new URLSearchParams({ type: "subscription", name });
   if (paid) params.set("paid", "1");

@@ -3,7 +3,8 @@ import { getSiteServices, pickService } from "@/lib/services";
 import { SubscriptionForm } from "./SubscriptionForm";
 
 // Продажа абонемента: 300 минут / 6 млн ₫, минуты живут 3 месяца.
-// Создаёт subscription (sold_by = инструктор) и членство клуба, если его нет.
+// Создаёт subscription (sold_by = инструктор). Членом клуба клиент при этом
+// НЕ становится — клуб запустим отдельно.
 
 export default async function SubscriptionPage() {
   const sub = pickService(await getSiteServices(), "subscription");

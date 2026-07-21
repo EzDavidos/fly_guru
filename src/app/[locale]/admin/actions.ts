@@ -379,8 +379,10 @@ export async function createSessionAction(
   });
   if (insError) return { error: `Не удалось создать сессию: ${insError.message}` };
 
-  // Награда агенту (pending — подтвердится при статусе done или кнопкой) и
-  // закрытие заявки: запись доведена до занятия.
+  // Награда агенту и закрытие заявки: запись доведена до оплаченного занятия.
+  // Оплата состоялась (сессия записана), поэтому награду пишем сразу
+  // `confirmed` датой сессии — она попадёт в расчёт того же месяца, что и
+  // выручка. Раньше висела pending, и в payroll агент оставался с 0.
   if (agent) {
     const { error: rewardError } = await supabase.from("referral_rewards").insert({
       referrer_type: "agent",
@@ -388,6 +390,8 @@ export async function createSessionAction(
       client_id: clientId,
       reward_type: "money",
       amount: agent.commission_fixed,
+      status: "confirmed",
+      confirmed_at: dayToIso(date),
     });
     // Не кидаем: сессия уже записана. Ошибка «не сохранилось» толкнула бы
     // админа оформить занятие второй раз — получили бы дубль чека в выручке.
@@ -522,21 +526,8 @@ export async function adminSellSubscriptionAction(
   });
   if (subError) return { error: `Не удалось создать абонемент: ${subError.message}` };
 
-  // Первый абонемент делает клиента членом клуба (как у инструктора).
-  const { data: membership } = await supabase
-    .from("memberships")
-    .select("id")
-    .eq("client_id", clientId)
-    .maybeSingle();
-  if (!membership) {
-    const { error: memError } = await supabase
-      .from("memberships")
-      .insert({ client_id: clientId });
-    // Не кидаем по той же причине, что и с наградой выше: абонемент уже продан,
-    // а повтор формы создал бы второй на того же клиента. Членство добавляется
-    // руками на вкладке «Члены клуба».
-    if (memError) console.error("[admin] membership insert error:", memError.message);
-  }
+  // Клуб пока не запускаем: продажа абонемента НЕ делает клиента членом клуба
+  // (как и у инструктора). Членство добавляется руками на вкладке «Члены клуба».
 
   revalidatePath("/", "layout");
   redirect("/admin/subscriptions");
