@@ -104,6 +104,31 @@ export default async function WriteOffPage({
     results = ((data ?? []) as ClientRow[]).filter((c) => matchClient(c, q.trim())).slice(0, 10);
   }
 
+  // ── Клиенты с живым абонементом: показываем сразу, без поиска, чтобы
+  // инструктору не приходилось каждый раз искать через строку. Остаток считаем
+  // тем же minutesLeft, что и на экране самого списания.
+  interface ActiveSubRow {
+    id: string;
+    total_minutes: number;
+    expires_at: string | null;
+    client: { id: string; name: string; phone: string | null } | null;
+  }
+  const { data: activeSubsRaw } = await supabase
+    .from("subscriptions")
+    .select("id, total_minutes, expires_at, client:clients(id, name, phone)")
+    .eq("status", "active")
+    .order("sold_at", { ascending: false });
+  const activeSubs = (activeSubsRaw ?? []) as unknown as ActiveSubRow[];
+  const activeList = (
+    await Promise.all(
+      activeSubs.map(async (s) => ({
+        client: s.client,
+        expiresAt: s.expires_at,
+        left: await minutesLeft(supabase, s),
+      })),
+    )
+  ).filter((r) => r.client && r.left > 0);
+
   return (
     <div>
       <h1 className="text-2xl font-bold">Списать минуты</h1>
@@ -125,6 +150,33 @@ export default async function WriteOffPage({
           Найти
         </button>
       </form>
+
+      {/* Пока не ищем — сразу список тех, у кого есть что списывать. */}
+      {!q && activeList.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold text-muted">С активным абонементом</h2>
+          <div className="mt-3 space-y-3">
+            {activeList.map((r) => (
+              <Link
+                key={r.client!.id}
+                href={`/instructor/writeoff?client=${r.client!.id}`}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-4 transition-colors hover:border-primary"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-bold">{r.client!.name}</p>
+                  {r.client!.phone && (
+                    <p className="truncate text-sm text-muted">{r.client!.phone}</p>
+                  )}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-lg font-bold text-primary">{r.left}</p>
+                  <p className="text-xs text-muted">мин</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {q && (
         <div className="mt-6 space-y-3">
