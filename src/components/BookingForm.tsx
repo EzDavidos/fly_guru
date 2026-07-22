@@ -15,6 +15,7 @@ interface BookingFormProps {
   services: ServiceOption[]; // список услуг для выпадающего списка (из базы)
   defaultServiceId?: string; // какая услуга выбрана заранее (зависит от страницы)
   refCode?: string; // реф-код (на лендинге /r/[code]) — вшивается скрыто в заявку
+  onSuccess?: () => void; // вызвать при успехе (модалка закрывается — иначе висит поверх /thanks)
 }
 
 // Каналы связи: по какому мессенджеру гостю удобнее, чтобы админ не гадал.
@@ -26,7 +27,7 @@ const inputClass =
 
 type Status = "idle" | "submitting" | "error" | "badPhone";
 
-export function BookingForm({ services, defaultServiceId, refCode }: BookingFormProps) {
+export function BookingForm({ services, defaultServiceId, refCode, onSuccess }: BookingFormProps) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [phone, setPhone] = useState("");
@@ -76,6 +77,10 @@ export function BookingForm({ services, defaultServiceId, refCode }: BookingForm
       // Успех — уводим на страницу «спасибо» (с номером заявки, если сервер
       // его вернул: клиент сможет назвать номер при созвоне).
       const { bookingNo } = (await res.json()) as { bookingNo?: number | null };
+      // Сначала закрываем модалку (если форма в ней): иначе панель с «Отправляем…»
+      // и заблокированный скролл висят поверх /thanks — форма будто зависла,
+      // хотя заявка ушла (пачка №5, п.1/3).
+      onSuccess?.();
       router.push(bookingNo ? `/thanks?no=${bookingNo}` : "/thanks");
     } catch {
       setStatus("error");
@@ -177,7 +182,15 @@ export function BookingForm({ services, defaultServiceId, refCode }: BookingForm
         <label htmlFor="preferredDate" className="mb-1 block text-sm font-medium">
           Желаемая дата
         </label>
-        <input id="preferredDate" name="preferredDate" type="date" className={inputClass} />
+        {/* min-w-0 + appearance-none: нативный date-инпут на iOS/Android имеет
+            собственную минимальную ширину и вылезал за края модалки на телефоне
+            (пачка №5, п.1). Теперь он ужимается в строку, как остальные поля. */}
+        <input
+          id="preferredDate"
+          name="preferredDate"
+          type="date"
+          className={`${inputClass} min-w-0 appearance-none`}
+        />
       </div>
 
       <div>

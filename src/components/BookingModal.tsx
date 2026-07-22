@@ -71,6 +71,7 @@ export function BookingModal({
             services={services}
             defaultServiceId={defaultServiceId}
             refCode={refCode}
+            onSuccess={onClose}
           />
         </div>
       </div>
