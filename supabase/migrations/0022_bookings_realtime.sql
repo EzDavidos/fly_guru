@@ -10,7 +10,20 @@
 -- с той же RLS-политикой на SELECT (bookings_select_staff, миграция 0005) —
 -- гость ничего не получит, только залогиненный персонал.
 
-alter publication supabase_realtime add table public.bookings;
+-- Идемпотентно: в некоторых проектах bookings уже в публикации (Realtime был
+-- включён для таблицы через UI). Добавляем только если её там ещё нет —
+-- повторный прогон не упадёт с «already member of publication».
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'bookings'
+  ) then
+    alter publication supabase_realtime add table public.bookings;
+  end if;
+end $$;
 
 -- Чтобы в событиях UPDATE/DELETE приходила строка целиком (а не только id) —
 -- пригодится, если позже захотим фильтровать события на клиенте по полям.
