@@ -19,7 +19,7 @@ interface BookingRow {
   pinned: boolean;
   internal_note: string | null;
   accepted_by: string | null;
-  services: { name: string } | null;
+  services: { name: string; category: string } | null;
   accepted: { name: string } | null;
 }
 
@@ -37,7 +37,7 @@ export default async function InstructorBookingsPage() {
     supabase
       .from("bookings")
       .select(
-        "id, client_name, phone, preferred_date, scheduled_time, age, weight, pinned, internal_note, accepted_by, services(name), accepted:users!accepted_by(name)",
+        "id, client_name, phone, preferred_date, scheduled_time, age, weight, pinned, internal_note, accepted_by, services(name, category), accepted:users!accepted_by(name)",
       )
       .eq("status", "confirmed")
       .order("pinned", { ascending: false })
@@ -121,10 +121,14 @@ export default async function InstructorBookingsPage() {
               {mine && (
                 <div className="mt-3 flex gap-2">
                   <Link
-                    href={`/instructor/record?booking=${b.id}`}
+                    href={
+                      b.services?.category === "subscription"
+                        ? `/instructor/subscription?booking=${b.id}`
+                        : `/instructor/record?booking=${b.id}`
+                    }
                     className={`${actionButton} bg-accent text-white hover:bg-accent-strong`}
                   >
-                    Записать клиента
+                    {b.services?.category === "subscription" ? "Продать абонемент" : "Записать клиента"}
                   </Link>
                   <form action={declineBookingAction} className="shrink-0">
                     <input type="hidden" name="id" value={b.id} />

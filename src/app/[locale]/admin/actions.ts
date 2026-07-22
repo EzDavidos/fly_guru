@@ -304,7 +304,7 @@ export async function createSessionAction(
   if (bookingId) {
     const { data: booking } = await supabase
       .from("bookings")
-      .select("status, ref_code")
+      .select("status, ref_code, services(category)")
       .eq("id", bookingId)
       .maybeSingle();
     if (!booking) return { error: "Заявка не найдена." };
@@ -314,6 +314,14 @@ export async function createSessionAction(
     if (booking.status === "done") {
       return {
         error: "Эта заявка уже проведена — занятие записано. Смотрите вкладку «Сессии».",
+      };
+    }
+    // Заявку на абонемент нельзя провести сессией: список услуг здесь без
+    // абонемента, поэтому она молча падала бы на базовое обучение, а абонемент
+    // не создавался. Отправляем на форму продажи (пачка №5, п.11).
+    if ((booking.services as unknown as { category?: string } | null)?.category === "subscription") {
+      return {
+        error: "Это заявка на абонемент — оформите её кнопкой «Продать абонемент» во вкладке «Абонементы».",
       };
     }
     if (booking.ref_code) {
@@ -525,6 +533,18 @@ export async function adminSellSubscriptionAction(
     paid_at: paid ? soldAt : null,
   });
   if (subError) return { error: `Не удалось создать абонемент: ${subError.message}` };
+
+  // Продажа из заявки на абонемент (кнопка «Продать абонемент» в ленте заявок):
+  // закрываем заявку и привязываем клиента. Раньше заявка-абонемент шла на
+  // «Запись клиента», где список услуг без абонемента → молча писалась сессия
+  // базового обучения, а абонемент не создавался вовсе (пачка №5, п.11).
+  const bookingId = String(formData.get("bookingId") ?? "") || null;
+  if (bookingId) {
+    await supabase
+      .from("bookings")
+      .update({ status: "done", client_id: clientId })
+      .eq("id", bookingId);
+  }
 
   // Клуб пока не запускаем: продажа абонемента НЕ делает клиента членом клуба
   // (как и у инструктора). Членство добавляется руками на вкладке «Члены клуба».

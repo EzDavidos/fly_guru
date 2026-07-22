@@ -13,7 +13,6 @@ import { MANUAL_CHANNELS } from "@/lib/channels";
 import { SaveForm } from "../SaveForm";
 import { getActiveDict } from "@/lib/dictionaries";
 import { BookingCreateForm } from "./BookingCreateForm";
-import { BookingsRealtime } from "./BookingsRealtime";
 
 export const metadata: Metadata = { title: "Админка · Заявки" };
 
@@ -41,7 +40,7 @@ interface BookingRow {
   client_id: string | null;
   rescheduled_at: string | null;
   created_at: string;
-  services: { name: string } | null;
+  services: { name: string; category: string } | null;
   accepted: { name: string } | null;
 }
 
@@ -256,10 +255,18 @@ function BookingCard({
               </>
             )}
             {!terminal && (
-              // Провести заявку как занятие: открывает «Запись клиента» с
-              // предзаполненными полями; сохранение закроет заявку (done).
-              <Link href={`/admin/record?booking=${b.id}`} className={btnGhost}>
-                Записать клиента
+              // Провести заявку. Абонемент — не сессия: ведём на форму продажи
+              // абонемента (там минуты/членство/оплата), иначе на «Запись
+              // клиента». В обоих случаях сохранение закроет заявку (done).
+              <Link
+                href={
+                  b.services?.category === "subscription"
+                    ? `/admin/subscriptions?booking=${b.id}`
+                    : `/admin/record?booking=${b.id}`
+                }
+                className={btnGhost}
+              >
+                {b.services?.category === "subscription" ? "Продать абонемент" : "Записать клиента"}
               </Link>
             )}
             {!terminal && (
@@ -355,7 +362,7 @@ export default async function AdminBookingsPage({
   const { data } = await supabase
     .from("bookings")
     .select(
-      "id, booking_no, client_name, phone, telegram_username, preferred_date, scheduled_time, age, weight, status, pinned, ref_code, src, utm, internal_note, client_id, rescheduled_at, created_at, services(name), accepted:users!accepted_by(name)",
+      "id, booking_no, client_name, phone, telegram_username, preferred_date, scheduled_time, age, weight, status, pinned, ref_code, src, utm, internal_note, client_id, rescheduled_at, created_at, services(name, category), accepted:users!accepted_by(name)",
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -401,8 +408,7 @@ export default async function AdminBookingsPage({
 
   return (
     <div>
-      {/* Живое обновление ленты: подписка на изменения bookings → refresh. */}
-      <BookingsRealtime />
+      {/* Живое обновление ленты и бейджа — в layout кабинета (BookingsBadgeRefresh). */}
       <h1 className="text-2xl font-bold">
         Актуальные заявки
         {freshCount > 0 && (

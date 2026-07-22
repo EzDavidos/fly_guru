@@ -175,7 +175,7 @@ export async function recordClientAction(
   if (bookingId) {
     const { data: booking } = await supabase
       .from("bookings")
-      .select("id, status, ref_code")
+      .select("id, status, ref_code, services(category)")
       .eq("id", bookingId)
       .maybeSingle();
     if (!booking) return { error: "Заявка не найдена." };
@@ -184,6 +184,12 @@ export async function recordClientAction(
     // агенту — чек задваивался в выручке и в ЗП.
     if (booking.status === "done") {
       return { error: "Эта заявка уже оформлена — занятие записано." };
+    }
+    // Заявку на абонемент сессией не проводим: список услуг здесь без
+    // абонемента, и она молча падала бы на базовое обучение, а абонемент не
+    // создавался (пачка №5, п.11). Отправляем на «Продать абонемент».
+    if ((booking.services as unknown as { category?: string } | null)?.category === "subscription") {
+      return { error: "Это заявка на абонемент — оформите её через «Продать абонемент»." };
     }
     refCode = booking.ref_code ?? null;
   }
@@ -295,13 +301,16 @@ export async function sellSubscriptionAction(
   const name = String(formData.get("name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const paid = formData.get("paid") === "on";
+  // Пришли из заявки на абонемент — закроем её после продажи (пачка №5, п.11).
+  const bookingId = String(formData.get("bookingId") ?? "") || null;
 
   if (!name || !phone) return { error: "Заполните имя и телефон." };
 
   const clientResult = await findOrCreateClient(supabase, user, {
     name,
     phone,
-    source: "offline",
+    telegram: normalizeTelegram(formData.get("telegramUsername") as string),
+    source: bookingId ? "site" : "offline",
   });
   if ("error" in clientResult) return { error: clientResult.error };
   const clientId = clientResult.id;
@@ -316,6 +325,14 @@ export async function sellSubscriptionAction(
     paid_at: paid ? new Date().toISOString() : null,
   });
   if (subError) return { error: `Не удалось создать абонемент: ${subError.message}` };
+
+  // Заявка доведена до продажи → закрываем её и привязываем клиента.
+  if (bookingId) {
+    await supabase
+      .from("bookings")
+      .update({ status: "done", client_id: clientId })
+      .eq("id", bookingId);
+  }
 
   // Клуб пока не запускаем: продажа абонемента НЕ делает клиента членом клуба.
   // Членство добавляется вручную на вкладке «Члены клуба» (вернём авто-выдачу,

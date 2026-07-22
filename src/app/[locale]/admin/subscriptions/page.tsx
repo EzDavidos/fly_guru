@@ -165,12 +165,35 @@ function SubscriptionCard({
 export default async function AdminSubscriptionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ f?: string }>;
+  searchParams: Promise<{ f?: string; booking?: string }>;
 }) {
-  const { f = "" } = await searchParams;
+  const { f = "", booking: bookingId } = await searchParams;
   const today = vnToday();
 
   const supabase = await createClient();
+
+  // Пришли из заявки на абонемент («Продать абонемент» в ленте заявок) —
+  // тянем контакты клиента, чтобы форма открылась уже заполненной, а продажа
+  // закрыла заявку. Так продажа с сайта не проваливается мимо минут/оплаты.
+  let bookingPrefill:
+    | { bookingId: string; name: string; phone: string; telegram: string | null; clientId: string | null }
+    | undefined;
+  if (bookingId) {
+    const { data: b } = await supabase
+      .from("bookings")
+      .select("id, status, client_name, phone, telegram_username, client_id")
+      .eq("id", bookingId)
+      .maybeSingle();
+    if (b && !["done", "cancelled", "archived"].includes(b.status)) {
+      bookingPrefill = {
+        bookingId: b.id,
+        name: b.client_name,
+        phone: b.phone,
+        telegram: b.telegram_username,
+        clientId: b.client_id,
+      };
+    }
+  }
   let subsQuery = supabase
     .from("subscriptions")
     .select(
@@ -260,15 +283,21 @@ export default async function AdminSubscriptionsPage({
         и комиссию продавца. Минуты правятся только с комментарием — всё в логе.
       </p>
 
-      <details className="mt-4 rounded-2xl border border-line bg-surface">
+      <details className="mt-4 rounded-2xl border border-line bg-surface" open={Boolean(bookingPrefill)}>
         <summary className="cursor-pointer list-none p-4 font-semibold text-primary [&::-webkit-details-marker]:hidden">
           + Продать абонемент
         </summary>
         <div className="border-t border-line/70 p-4 pt-3">
+          {bookingPrefill && (
+            <p className="mb-3 rounded-xl bg-primary/10 px-3 py-2 text-xs text-primary">
+              Заявка на абонемент от <b>{bookingPrefill.name}</b> — продажа закроет её.
+            </p>
+          )}
           <SellSubscriptionForm
             clients={clientsRes.data ?? []}
             staff={staffRes.data ?? []}
             today={today}
+            prefill={bookingPrefill}
           />
         </div>
       </details>

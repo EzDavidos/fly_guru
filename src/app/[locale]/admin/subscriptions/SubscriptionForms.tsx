@@ -19,22 +19,35 @@ const inputClass =
 
 // Продажа абонемента админом: клиент из списка или новый, продавец (его
 // комиссия), цена (пусто = 6 млн по умолчанию), дата продажи, отметка оплаты.
+// Префилл из заявки на абонемент: контакты клиента + id заявки, которую
+// продажа должна закрыть. Если у заявки уже привязан clientId — используем его.
+export interface SubscriptionPrefill {
+  bookingId: string;
+  name: string;
+  phone: string;
+  telegram: string | null;
+  clientId: string | null;
+}
+
 export function SellSubscriptionForm({
   clients,
   staff,
   today,
+  prefill,
 }: {
   clients: ClientOption[];
   staff: Option[];
   today: string;
+  prefill?: SubscriptionPrefill;
 }) {
   const [state, formAction, pending] = useActionState(adminSellSubscriptionAction, {
     error: null,
   });
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(prefill?.clientId ?? "");
 
   return (
     <form action={formAction} className="space-y-3">
+      {prefill && <input type="hidden" name="bookingId" value={prefill.bookingId} />}
       <label className="block text-xs text-muted">
         Клиент
         <select
@@ -54,16 +67,31 @@ export function SellSubscriptionForm({
       </label>
 
       {clientId === "" && (
-        <div className="grid grid-cols-2 gap-2">
-          <label className="text-xs text-muted">
-            Имя нового клиента
-            <input type="text" name="newName" className={`mt-1 ${inputClass}`} />
-          </label>
-          <label className="text-xs text-muted">
-            Телефон
-            <input type="tel" name="newPhone" className={`mt-1 ${inputClass}`} />
-          </label>
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs text-muted">
+              Имя нового клиента
+              <input
+                type="text"
+                name="newName"
+                defaultValue={prefill?.name ?? ""}
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+            <label className="text-xs text-muted">
+              Телефон
+              <input
+                type="tel"
+                name="newPhone"
+                defaultValue={prefill?.phone ?? ""}
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+          </div>
+          {prefill?.telegram && (
+            <input type="hidden" name="telegramUsername" value={prefill.telegram} />
+          )}
+        </>
       )}
 
       <div className="grid grid-cols-2 gap-2">
