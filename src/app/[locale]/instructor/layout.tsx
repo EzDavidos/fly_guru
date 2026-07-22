@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { vnCurrentMonth } from "@/lib/dates";
 import { getInstructorStats, vnd } from "@/lib/stats";
+import { BookingsBadgeRefresh } from "@/components/BookingsBadgeRefresh";
 import { Sidebar } from "./Sidebar";
 
 export const metadata: Metadata = { title: "Кабинет инструктора" };
@@ -43,6 +44,8 @@ export default async function InstructorLayout({
     // колонка, над которой мышь; левый бар не уезжает). На телефоне — обычный
     // скролл страницы, меню в фиксированной нижней панели (pb-24 под неё).
     <div className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 md:h-[calc(100dvh-4rem)] md:py-0">
+      {/* Живой красный бейдж записей на всех разделах кабинета */}
+      <BookingsBadgeRefresh channel="instructor-bookings-badge" />
       <div className="md:flex md:h-full md:gap-6">
         <Sidebar
           name={user.name}
