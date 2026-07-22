@@ -100,20 +100,43 @@ export async function sendShiftReminder(kind: "open" | "close"): Promise<void> {
 }
 
 // Общая отправка простым текстом (без Markdown — надёжнее, ничего не надо
-// экранировать). Ошибки глотаем: уведомление — дополнение, не звено процесса.
+// экранировать). Операцию не роняем из-за уведомления, но и не глотаем сбой
+// молча — пишем в лог, иначе «уведомление не пришло» невозможно расследовать.
+//
+// Две попытки: ПЕРВЫЙ исходящий запрос из «холодной» serverless-функции (свежий
+// инстанс — DNS + TLS-хендшейк) бывает заметно медленнее и не укладывался в
+// прежний таймаут 4с — терялось именно первое уведомление, а «тёплые» доходили.
+// Больший таймаут + ретрай это закрывают.
 async function sendTelegram(chatId: string, text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;
 
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text }),
-      // Не ждём вечно: если Telegram недоступен, не держим ответ.
-      signal: AbortSignal.timeout(4000),
-    });
-  } catch {
-    // Telegram недоступен/таймаут — не роняем операцию из-за уведомления.
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const body = JSON.stringify({ chat_id: chatId, text });
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) return;
+
+      // Telegram ответил ошибкой. 4xx — наш запрос кривой (неверный chat_id и
+      // т.п.), ретрай не поможет: логируем и выходим. 5xx/сеть — пробуем ещё.
+      const detail = await res.text().catch(() => "");
+      console.error(
+        `[telegram] send failed (attempt ${attempt}): ${res.status} ${detail}`,
+      );
+      if (res.status >= 400 && res.status < 500) return;
+    } catch (e) {
+      // Таймаут/сеть — не роняем операцию, но фиксируем в логе и ретраим.
+      console.error(
+        `[telegram] send error (attempt ${attempt}):`,
+        e instanceof Error ? e.message : e,
+      );
+    }
   }
 }
