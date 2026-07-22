@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { vnCurrentMonth } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
+import { getFinance } from "@/lib/finance";
 import { Sidebar } from "./Sidebar";
 
 export const metadata: Metadata = { title: "Админка" };
@@ -17,31 +18,20 @@ export default async function AdminLayout({
 }) {
   const user = await requireRole("admin", "/admin");
 
-  // Данные для карточки профиля в сайдбаре: выручка школы за месяц и число
-  // новых заявок (красный счётчик). Раньше считались на главном экране —
-  // теперь тут, чтобы жить в сайдбаре на всех разделах.
+  // Данные для карточки профиля в сайдбаре: чистая прибыль школы за месяц и
+  // число новых заявок (красный счётчик). Прибыль (а не выручку) босс хочет
+  // видеть под рукой на всех разделах — тот же расчёт, что во вкладке «Расходы»
+  // (выручка − Marina 35% − ЗП − CRM 2% − комиссии агентов − ручные расходы).
   const supabase = await createClient();
   const month = vnCurrentMonth();
-  const [sessionsRes, paidSubsRes, freshRes] = await Promise.all([
-    supabase
-      .from("sessions")
-      .select("amount")
-      .gte("date", month.fromDay)
-      .lt("date", month.toDay),
-    supabase
-      .from("subscriptions")
-      .select("price")
-      .gte("paid_at", month.fromIso)
-      .lt("paid_at", month.toIso),
+  const [fin, freshRes] = await Promise.all([
+    getFinance(supabase, month),
     supabase
       .from("bookings")
       .select("id", { count: "exact", head: true })
       .eq("status", "new"),
   ]);
 
-  const revenue =
-    (sessionsRes.data ?? []).reduce((s, r) => s + (r.amount ?? 0), 0) +
-    (paidSubsRes.data ?? []).reduce((s, r) => s + (r.price ?? 0), 0);
   const freshCount = freshRes.count ?? 0;
 
   return (
@@ -54,8 +44,8 @@ export default async function AdminLayout({
         <Sidebar
           name={user.name}
           photoUrl={user.photo_url}
-          amountLabel={vnd(revenue)}
-          amountSub={`Выручка за ${month.label} · только оплаченное`}
+          amountLabel={vnd(fin.netProfit)}
+          amountSub={`Чистая прибыль за ${month.label} · после всех расходов`}
           freshCount={freshCount}
         />
         <main className="scroll-soft mt-4 min-w-0 md:mt-0 md:flex-1 md:overflow-y-auto md:overscroll-contain md:py-6">
