@@ -17,8 +17,7 @@ export default async function AdminSettingsPage() {
   if (!user) return null; // layout уже средиректил бы; страховка для типов
 
   const supabase = await createClient();
-  const [categories, methods, equipment] = await Promise.all([
-    getFullDict(supabase, "expense_categories"),
+  const [methods, equipment] = await Promise.all([
     getFullDict(supabase, "payment_methods"),
     getFullEquipment(supabase),
   ]);
@@ -27,8 +26,8 @@ export default async function AdminSettingsPage() {
     <div>
       <h1 className="text-2xl font-bold">Настройки</h1>
       <p className="mt-1 text-sm text-muted">
-        Имя и фото видны в кабинете. Справочники ниже питают формы расходов и
-        оплаты.
+        Имя и фото видны в кабинете. Ниже — форматы оплаты и инвентарь.
+        Категории расходов теперь редактируются во вкладке «Расходы».
       </p>
       <div className="mt-6">
         <SettingsForm
@@ -41,13 +40,6 @@ export default async function AdminSettingsPage() {
       </div>
 
       <div className="mt-6 space-y-3">
-        <DictionaryManager
-          table="expense_categories"
-          title="Категории расходов"
-          hint="Из этого списка выбирают категорию вы и инструкторы при внесении расхода."
-          placeholder="Топливо"
-          items={categories}
-        />
         <DictionaryManager
           table="payment_methods"
           title="Форматы оплаты"
