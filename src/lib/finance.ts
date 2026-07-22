@@ -35,6 +35,7 @@ export interface ExpenseRow {
   category: string | null;
   amount: number;
   comment: string | null;
+  author: string | null; // кто внёс — чтобы отличать траты инструктора от своих
 }
 
 export interface Finance {
@@ -76,7 +77,7 @@ export async function getFinance(
       supabase
         .from("expenses")
         .select(
-          "id, date, amount, comment, category:expense_categories!category_id(name)",
+          "id, date, amount, comment, category:expense_categories!category_id(name), author:users!created_by(name)",
         )
         .gte("date", range.fromDay)
         .lt("date", range.toDay)
@@ -143,6 +144,8 @@ export async function getFinance(
       (e.category as unknown as { name: string } | null)?.name ?? null,
     amount: Number(e.amount ?? 0),
     comment: (e.comment as string | null) ?? null,
+    author:
+      (e.author as unknown as { name: string } | null)?.name ?? null,
   }));
   const manualTotal = manualExpenses.reduce((s, e) => s + e.amount, 0);
 

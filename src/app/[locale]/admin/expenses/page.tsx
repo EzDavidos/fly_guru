@@ -6,8 +6,9 @@ import { getFinance } from "@/lib/finance";
 import { MonthSwitcher, resolveYm } from "../MonthSwitcher";
 import { ConfirmSubmit } from "../ConfirmSubmit";
 import { deleteExpenseAction, addExpenseAction } from "../actions";
-import { getActiveDict } from "@/lib/dictionaries";
+import { getActiveDict, getFullDict } from "@/lib/dictionaries";
 import { ExpenseFields } from "@/components/cabinet/ExpenseFields";
+import { DictionaryManager } from "../settings/DictionaryManager";
 
 export const metadata: Metadata = { title: "Админка · Расходы" };
 
@@ -47,9 +48,10 @@ export default async function AdminExpensesPage({
   const month = vnMonth(ym);
 
   const supabase = await createClient();
-  const [fin, categories] = await Promise.all([
+  const [fin, categories, allCategories] = await Promise.all([
     getFinance(supabase, month),
-    getActiveDict(supabase, "expense_categories"),
+    getActiveDict(supabase, "expense_categories"), // активные — для выпадашки
+    getFullDict(supabase, "expense_categories"), // все (в т.ч. скрытые) — для управления
   ]);
 
   return (
@@ -137,6 +139,7 @@ export default async function AdminExpensesPage({
                   </p>
                   <p className="truncate text-xs text-muted">
                     {e.date}
+                    {e.author && ` · внёс: ${e.author}`}
                     {e.comment && ` · ${e.comment}`}
                   </p>
                 </div>
@@ -172,6 +175,18 @@ export default async function AdminExpensesPage({
           </div>
         </div>
       </section>
+
+      {/* Категории расходов — управление рядом с самими расходами (пак 3). Из
+          этого списка выбирают категорию и админ, и инструкторы. */}
+      <div className="mt-3">
+        <DictionaryManager
+          table="expense_categories"
+          title="Категории расходов"
+          hint="Из этого списка выбираете категорию вы и инструкторы при внесении расхода."
+          placeholder="Топливо"
+          items={allCategories}
+        />
+      </div>
     </div>
   );
 }
