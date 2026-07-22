@@ -60,6 +60,18 @@ export default async function RecordPage({
         refCode: booking.ref_code,
         telegram: booking.telegram_username,
       };
+      // Скидку даёт ТОЛЬКО агентский код, инструкторский — нет. Проверяем,
+      // чей это код, чтобы форма не обещала скидку там, где её не будет
+      // (та же логика, что в recordClientAction при расчёте чека).
+      if (booking.ref_code) {
+        const { data: agent } = await supabase
+          .from("agents")
+          .select("id")
+          .eq("ref_code", booking.ref_code)
+          .eq("active", true)
+          .maybeSingle();
+        prefill.refIsAgent = Boolean(agent);
+      }
     }
   }
 

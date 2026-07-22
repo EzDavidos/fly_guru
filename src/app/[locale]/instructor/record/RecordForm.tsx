@@ -13,6 +13,7 @@ export interface RecordPrefill {
   phone?: string;
   serviceId?: string;
   refCode?: string | null;
+  refIsAgent?: boolean; // код агента (скидка) или инструктора (без скидки)
   telegram?: string | null;
 }
 
@@ -40,12 +41,18 @@ export function RecordForm({
         <input type="hidden" name="bookingId" value={prefill.bookingId} />
       )}
 
-      {prefill?.refCode && (
-        <p className="rounded-xl bg-accent/10 px-4 py-3 text-sm font-medium text-accent-strong">
-          Заявка по реф-ссылке «{prefill.refCode}» — на базовое обучение
-          автоматически применится скидка 200 000 ₫.
-        </p>
-      )}
+      {prefill?.refCode &&
+        (prefill.refIsAgent ? (
+          <p className="rounded-xl bg-accent/10 px-4 py-3 text-sm font-medium text-accent-strong">
+            Заявка по агентской ссылке «{prefill.refCode}» — на базовое обучение
+            автоматически применится скидка 10%.
+          </p>
+        ) : (
+          <p className="rounded-xl bg-line/40 px-4 py-3 text-sm text-muted">
+            Заявка по реф-ссылке инструктора «{prefill.refCode}». Скидки нет — она
+            действует только по агентским ссылкам.
+          </p>
+        ))}
 
       <div>
         <label htmlFor="name" className="mb-1 block text-sm font-medium">
