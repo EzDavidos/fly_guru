@@ -13,6 +13,7 @@ import { MANUAL_CHANNELS } from "@/lib/channels";
 import { SaveForm } from "../SaveForm";
 import { getActiveDict } from "@/lib/dictionaries";
 import { BookingCreateForm } from "./BookingCreateForm";
+import { BookingsRealtime } from "./BookingsRealtime";
 
 export const metadata: Metadata = { title: "Админка · Заявки" };
 
@@ -400,6 +401,8 @@ export default async function AdminBookingsPage({
 
   return (
     <div>
+      {/* Живое обновление ленты: подписка на изменения bookings → refresh. */}
+      <BookingsRealtime />
       <h1 className="text-2xl font-bold">
         Актуальные заявки
         {freshCount > 0 && (
