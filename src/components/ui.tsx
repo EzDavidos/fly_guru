@@ -78,8 +78,17 @@ type ButtonProps = {
   className?: string;
 };
 
-// Кнопка-ссылка. Использует локале-осведомлённый Link (сам ставит /en, /vi).
-export function Button({ href, children, variant = "primary", size = "md", className = "" }: ButtonProps) {
+// Классы кнопки одним местом — их переиспользует и <Button> (ссылка), и
+// <BookBtn> (открывает модалку записи), чтобы обе выглядели одинаково.
+export function buttonClasses({
+  variant = "primary",
+  size = "md",
+  className = "",
+}: {
+  variant?: "primary" | "secondary" | "ghost";
+  size?: "md" | "lg";
+  className?: string;
+} = {}): string {
   const base =
     "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors";
   const sizes = { md: "px-5 py-3 text-sm", lg: "px-7 py-4 text-base" };
@@ -88,8 +97,13 @@ export function Button({ href, children, variant = "primary", size = "md", class
     secondary: "border border-primary text-primary hover:bg-primary hover:text-white",
     ghost: "text-primary hover:text-primary-strong",
   };
+  return `${base} ${sizes[size]} ${variants[variant]} ${className}`;
+}
+
+// Кнопка-ссылка. Использует локале-осведомлённый Link (сам ставит /en, /vi).
+export function Button({ href, children, variant = "primary", size = "md", className = "" }: ButtonProps) {
   return (
-    <Link href={href} className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}>
+    <Link href={href} className={buttonClasses({ variant, size, className })}>
       {children}
     </Link>
   );
