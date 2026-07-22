@@ -1,4 +1,5 @@
 import { Container, Section, SectionHeading, Card, Button } from "@/components/ui";
+import { BookBtn } from "@/components/BookBtn";
 import { Media, VideoLoop } from "@/components/Media";
 import { Faq } from "@/components/Faq";
 import { ReviewCard } from "@/components/ReviewCard";
@@ -48,9 +49,7 @@ export default function HomePage() {
                 инструктор всё время рядом с вами на воде.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Button href="/training#form" size="lg">
-                  Записаться
-                </Button>
+                <BookBtn size="lg">Записаться</BookBtn>
                 <Button href="/tandem" size="lg" variant="secondary">
                   Попробовать тандем
                 </Button>

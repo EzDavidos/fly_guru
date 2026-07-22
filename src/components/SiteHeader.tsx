@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useBooking } from "./BookingProvider";
 import { NAV_LINKS } from "./nav";
 
 // Шапка сайта. Клиентский компонент ради мобильного меню и кнопки «Вход/Кабинет».
@@ -15,6 +16,7 @@ import { NAV_LINKS } from "./nav";
 // (99% посетителей) ничего не мигает.
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const { open: openBooking } = useBooking();
   // Куда ведёт кнопка кабинета: null = не залогинен (показываем «Вход»).
   const [cabinetHref, setCabinetHref] = useState<string | null>(null);
   // Активные записи (подтверждены админом, никем не приняты) — красный
@@ -101,12 +103,13 @@ export function SiteHeader() {
             {authLabel}
             {countBubble}
           </Link>
-          <Link
-            href="/training#form"
+          <button
+            type="button"
+            onClick={() => openBooking()}
             className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
           >
             Записаться
-          </Link>
+          </button>
         </nav>
 
         {/* Кнопка мобильного меню */}
@@ -147,13 +150,16 @@ export function SiteHeader() {
                 </span>
               )}
             </Link>
-            <Link
-              href="/training#form"
-              onClick={() => setOpen(false)}
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                openBooking();
+              }}
               className="mt-2 mb-2 rounded-full bg-accent px-5 py-3 text-center font-semibold text-white"
             >
               Записаться
-            </Link>
+            </button>
           </div>
         </nav>
       )}

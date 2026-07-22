@@ -3,7 +3,7 @@ import { Container, Section, SectionHeading, Card, Button, Badge } from "@/compo
 import { IconCheck, IconWaves, IconPin, IconClub } from "@/components/icons";
 import { Media, VideoLoop } from "@/components/Media";
 import { formatVnd, formatDuration } from "@/content/services";
-import { BookingForm } from "@/components/BookingForm";
+import { BookBtn } from "@/components/BookBtn";
 import { getActiveServices, getSiteServices, pickService } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Клуб" };
@@ -224,22 +224,9 @@ export default async function ClubPage() {
               и +30, если он купил абонемент.
             </p>
             <div className="mt-6">
-              <Button href="#form" variant="secondary">Стать членом клуба</Button>
-            </div>
-          </div>
-        </Container>
-      </Section>
-
-      {/* Форма записи (клуб/абонемент) */}
-      <Section id="form" tone="muted">
-        <Container>
-          <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
-            <h2 className="text-2xl font-bold">Оставить заявку</h2>
-            <p className="mt-3 text-muted">
-              Хотите абонемент или есть вопросы по клубу — оставьте контакт, свяжемся и всё расскажем.
-            </p>
-            <div className="mt-8">
-              <BookingForm services={services} defaultServiceId={defaultServiceId} />
+              <BookBtn serviceId={defaultServiceId} variant="secondary">
+                Стать членом клуба
+              </BookBtn>
             </div>
           </div>
         </Container>

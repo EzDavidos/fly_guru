@@ -1,12 +1,12 @@
 import { setRequestLocale } from "next-intl/server";
-import { Container, Section, SectionHeading, Card, Badge, Button } from "@/components/ui";
+import { Container, Section, SectionHeading, Card, Badge } from "@/components/ui";
 import { Media } from "@/components/Media";
 import { IconCheck } from "@/components/icons";
 import { redirect } from "@/i18n/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveServices } from "@/lib/services";
 import { getService } from "@/content/services";
-import { BookingForm } from "@/components/BookingForm";
+import { BookBtn } from "@/components/BookBtn";
 import { RefVisitLogger } from "@/components/RefVisitLogger";
 
 // Реф-лендинг: гость приходит по личной ссылке /r/<код>. Ссылка бывает двух
@@ -84,9 +84,9 @@ export default async function ReferralLandingPage({
                   : " Запишитесь напрямую к вашему инструктору."}
               </p>
               <div className="mt-8">
-                <Button href="#form" size="lg">
+                <BookBtn refCode={code} serviceId={defaultServiceId} size="lg">
                   {isAgent ? "Записаться со скидкой" : "Записаться"}
-                </Button>
+                </BookBtn>
               </div>
             </div>
             <Media
@@ -147,28 +147,14 @@ export default async function ReferralLandingPage({
                 Скидка применяется к базовому занятию (взрослый). Действует по этой ссылке.
               </p>
               <div className="mt-8">
-                <Button href="#form" size="lg">Записаться</Button>
+                <BookBtn refCode={code} serviceId={defaultServiceId} size="lg">
+                  Записаться
+                </BookBtn>
               </div>
             </div>
           </Container>
         </Section>
       )}
-
-      {/* Форма записи с вшитым реф-кодом */}
-      <Section id="form" tone="muted">
-        <Container>
-          <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
-            <h2 className="text-2xl font-bold">{isAgent ? "Запись со скидкой" : "Запись"}</h2>
-            <p className="mt-3 text-muted">
-              Оставьте контакт — свяжемся, подтвердим время
-              {isAgent ? " и скидку." : "."}
-            </p>
-            <div className="mt-8">
-              <BookingForm services={services} defaultServiceId={defaultServiceId} refCode={code} />
-            </div>
-          </div>
-        </Container>
-      </Section>
     </>
   );
 }

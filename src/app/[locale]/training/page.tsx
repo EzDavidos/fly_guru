@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Container, Section, SectionHeading, Card, Button, Badge } from "@/components/ui";
+import { Container, Section, SectionHeading, Card, Badge } from "@/components/ui";
 import { Media, VideoPlayer } from "@/components/Media";
 import { Faq } from "@/components/Faq";
 import { IconCheck } from "@/components/icons";
 import { formatVnd, formatDuration } from "@/content/services";
 import { trainingFaq } from "@/content/faq";
-import { BookingForm } from "@/components/BookingForm";
+import { BookBtn } from "@/components/BookBtn";
 import { getActiveServices, getSiteServices, pickService } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Обучение" };
@@ -46,7 +46,7 @@ export default async function TrainingPage() {
                 до уверенного самостоятельного катания обычно 3–5 занятий.
               </p>
               <div className="mt-8">
-                <Button href="#form" size="lg">Записаться на обучение</Button>
+                <BookBtn serviceId={defaultServiceId} size="lg">Записаться на обучение</BookBtn>
               </div>
             </div>
             <Media
@@ -91,7 +91,13 @@ export default async function TrainingPage() {
                   </li>
                 </ul>
                 <div className="mt-6">
-                  <Button href="#form" variant="secondary" className="w-full">Записаться</Button>
+                  <BookBtn
+                    serviceId={services.find((x) => x.name === s.name)?.id ?? defaultServiceId}
+                    variant="secondary"
+                    className="w-full"
+                  >
+                    Записаться
+                  </BookBtn>
                 </div>
               </Card>
             ))}
@@ -145,20 +151,6 @@ export default async function TrainingPage() {
         </Container>
       </Section>
 
-      {/* Форма записи на обучение */}
-      <Section id="form">
-        <Container>
-          <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
-            <h2 className="text-2xl font-bold">Запись на обучение</h2>
-            <p className="mt-3 text-muted">
-              Оставьте контакт — свяжемся, подтвердим время и ответим на вопросы.
-            </p>
-            <div className="mt-8">
-              <BookingForm services={services} defaultServiceId={defaultServiceId} />
-            </div>
-          </div>
-        </Container>
-      </Section>
     </>
   );
 }

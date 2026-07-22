@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Container, Section, SectionHeading, Card, Button } from "@/components/ui";
 import { Media } from "@/components/Media";
 import { formatVnd, formatDuration } from "@/content/services";
-import { BookingForm } from "@/components/BookingForm";
+import { BookBtn } from "@/components/BookBtn";
 import { getActiveServices, getSiteServices, pickService } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Тандем" };
@@ -40,7 +40,7 @@ export default async function TandemPage() {
                 и обязательств.
               </p>
               <div className="mt-8">
-                <Button href="#form" size="lg">Записаться на тандем</Button>
+                <BookBtn serviceId={services[0]?.id} size="lg">Записаться на тандем</BookBtn>
               </div>
             </div>
             {/* Кадр снят вертикально — родные 9:16, иначе object-cover срежет
@@ -69,7 +69,13 @@ export default async function TandemPage() {
                   <span className="text-sm text-muted">/ {formatDuration(s)}</span>
                 </div>
                 <div className="mt-6">
-                  <Button href="#form" variant="secondary" className="w-full">Записаться</Button>
+                  <BookBtn
+                    serviceId={services.find((x) => x.name === s.name)?.id}
+                    variant="secondary"
+                    className="w-full"
+                  >
+                    Записаться
+                  </BookBtn>
                 </div>
               </Card>
             ))}
@@ -108,20 +114,6 @@ export default async function TandemPage() {
         </Container>
       </Section>
 
-      {/* Форма записи на тандем */}
-      <Section tone="muted" id="form">
-        <Container>
-          <div className="mx-auto max-w-2xl rounded-3xl border border-line bg-surface p-8 sm:p-10">
-            <h2 className="text-2xl font-bold">Запись на тандем</h2>
-            <p className="mt-3 text-muted">
-              Оставьте контакт — свяжемся и подберём удобное время для полёта.
-            </p>
-            <div className="mt-8">
-              <BookingForm services={services} />
-            </div>
-          </div>
-        </Container>
-      </Section>
     </>
   );
 }
