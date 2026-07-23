@@ -17,6 +17,12 @@ export interface ServiceOption {
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
 
+// Нативные поля даты и времени: то же оформление, что у остальных, плюс сброс
+// системного вида. Без него Safari на iOS держит поле своей «естественной»
+// ширины, не слушая w-full, — и дата наезжала на время. Префиксную запись
+// оставляем ради старых iOS, где безпрефиксный appearance ещё не работал.
+const nativeFieldClass = `min-w-0 appearance-none [-webkit-appearance:none] ${inputClass}`;
+
 export function BookingCreateForm({
   services,
   today,
@@ -114,10 +120,13 @@ export function BookingCreateForm({
         </select>
       </label>
 
-      {/* min-w-0 у ячеек: у нативных date/time своя минимальная ширина, а ячейка
-          грида по умолчанию не даёт себя ужать (min-width: auto) — на телефоне
-          дата распирала колонку и наезжала на время. items-end держит поля на
-          одной линии, даже если подпись переносится на вторую строку. */}
+      {/* Дата и время на телефоне налезали друг на друга. Лечится в двух местах:
+          • ячейка грида по умолчанию не ужимается (min-width: auto) — min-w-0;
+          • сам нативный контрол в Safari на iOS игнорирует width и держит свою
+            «естественную» ширину (у него она ещё и зависит от локали телефона:
+            07/23/2026 и 12:00 PM шире, чем 23.07.2026 и 12:00) — снимаем с него
+            нативное оформление (appearance), только тогда он слушается ширину.
+          items-end держит поля на одной линии, если подпись перенеслась. */}
       <div className="grid grid-cols-2 items-end gap-2">
         <label className="min-w-0 text-xs text-muted">
           Дата (можно будущую)
@@ -125,12 +134,12 @@ export function BookingCreateForm({
             type="date"
             name="preferredDate"
             defaultValue={today}
-            className={`mt-1 min-w-0 ${inputClass}`}
+            className={`mt-1 ${nativeFieldClass}`}
           />
         </label>
         <label className="min-w-0 text-xs text-muted">
           Время
-          <input type="time" name="scheduledTime" className={`mt-1 min-w-0 ${inputClass}`} />
+          <input type="time" name="scheduledTime" className={`mt-1 ${nativeFieldClass}`} />
         </label>
       </div>
 
