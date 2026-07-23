@@ -1,7 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { adminSellSubscriptionAction, adjustMinutesAction } from "../actions";
+import {
+  adminSellSubscriptionAction,
+  adjustMinutesAction,
+  writeOffMinutesAction,
+} from "../actions";
 
 // Клиентские кусочки страницы абонементов: две формы с ошибками без
 // перезагрузки (useActionState). Кнопка с confirm() — в ../ConfirmSubmit.
@@ -168,6 +172,72 @@ export function SellSubscriptionForm({
         className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong disabled:opacity-60"
       >
         {pending ? "Сохраняем…" : "Продать абонемент"}
+      </button>
+    </form>
+  );
+}
+
+// Прокат по абонементу: клиент откатал минуты в конкретный день. Пишется
+// сессией (без денег), поэтому человек виден в «Сессиях» этого дня — в отличие
+// от корректировки ниже, которая живёт только в истории абонемента.
+export function WriteOffMinutesForm({
+  subscriptionId,
+  staff,
+  today,
+}: {
+  subscriptionId: string;
+  staff: Option[];
+  today: string;
+}) {
+  const [state, formAction, pending] = useActionState(writeOffMinutesAction, {
+    error: null,
+  });
+
+  return (
+    <form action={formAction} className="mt-3 space-y-2">
+      <input type="hidden" name="subscriptionId" value={subscriptionId} />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <label className="text-xs text-muted">
+          Откатал, мин
+          <input
+            type="number"
+            name="minutes"
+            min={1}
+            placeholder="45"
+            required
+            className={`mt-1 ${inputClass}`}
+          />
+        </label>
+        <label className="text-xs text-muted">
+          Дата проката
+          <input
+            type="date"
+            name="date"
+            defaultValue={today}
+            max={today}
+            required
+            className={`mt-1 ${inputClass}`}
+          />
+        </label>
+        <label className="col-span-2 text-xs text-muted sm:col-span-1">
+          Инструктор
+          <select name="instructorId" className={`mt-1 ${inputClass}`}>
+            <option value="">— не указан —</option>
+            {staff.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+      >
+        {pending ? "Списываем…" : "Списать минуты"}
       </button>
     </form>
   );

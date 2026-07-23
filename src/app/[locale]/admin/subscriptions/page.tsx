@@ -10,7 +10,11 @@ import {
 } from "../actions";
 import { ConfirmSubmit } from "../ConfirmSubmit";
 import { getActiveDict } from "@/lib/dictionaries";
-import { SellSubscriptionForm, AdjustMinutesForm } from "./SubscriptionForms";
+import {
+  SellSubscriptionForm,
+  AdjustMinutesForm,
+  WriteOffMinutesForm,
+} from "./SubscriptionForms";
 
 export const metadata: Metadata = { title: "Админка · Абонементы" };
 
@@ -51,12 +55,15 @@ function SubscriptionCard({
   left,
   history,
   today,
+  staff,
   paymentName,
 }: {
   s: SubRow;
   left: number;
   history: HistoryItem[];
   today: string;
+  // Кому записать прокат — тот же список, что в форме продажи.
+  staff: { id: string; name: string }[];
   // Чем заплатили (0025). undefined — миграция ещё не накатана или продажа
   // прошла до неё: тогда блок просто не показываем.
   paymentName?: string;
@@ -163,8 +170,30 @@ function SubscriptionCard({
         </form>
         )}
 
-        {/* Корректировка минут */}
-        {!cancelled && <AdjustMinutesForm subscriptionId={s.id} />}
+        {/* Прокат: минуты откатаны — уходят сессией в ленту того дня (п.6) */}
+        {!cancelled && (
+          <div className="mt-4 border-t border-line/70 pt-3">
+            <p className="text-xs font-semibold text-muted">
+              Клиент откатал минуты
+            </p>
+            <WriteOffMinutesForm
+              subscriptionId={s.id}
+              staff={staff}
+              today={today}
+            />
+          </div>
+        )}
+
+        {/* Корректировка минут — не прокат: компенсации и исправления ошибок,
+            в «Сессии» не попадают, живут только в истории абонемента. */}
+        {!cancelled && (
+          <div className="mt-4 border-t border-line/70 pt-3">
+            <p className="text-xs font-semibold text-muted">
+              Поправить минуты (компенсация, ошибка — в сессии не попадёт)
+            </p>
+            <AdjustMinutesForm subscriptionId={s.id} />
+          </div>
+        )}
 
         {/* История: списания + корректировки */}
         {history.length > 0 && (
@@ -427,6 +456,7 @@ export default async function AdminSubscriptionsPage({
             left={leftOf(s)}
             history={historyBySub.get(s.id) ?? []}
             today={today}
+            staff={staffRes.data ?? []}
             paymentName={paymentBySub.get(s.id)}
           />
         ))}

@@ -607,6 +607,66 @@ export async function togglePaidAction(formData: FormData) {
 // Ручная корректировка минут: только с комментарием (почему), пишется в лог
 // subscription_adjustments от имени админа. Может вернуть абонемент из
 // used_up в active (и наоборот), но не воскрешает истёкший.
+// Прокат по абонементу глазами админа (пачка №6, п.6): клиент откатал минуты —
+// это ЗАНЯТИЕ, поэтому пишем сессию (amount = 0) в день проката, а не
+// корректировку. Так человек виден в «Сессиях» того дня: «был такой-то,
+// откатал 45 минут абонемента».
+//
+// Раньше у админа была только кнопка «Скорректировать минуты» — она пишет в
+// subscription_adjustments и в сессии не попадает вообще. Из-за этого прокаты,
+// оформленные админом, в ленте дня не появлялись, хотя списание инструктора
+// (у него свой экран) появлялось. Корректировка остаётся для того, ради чего
+// задумана: компенсации и исправления ошибок с комментарием в логе.
+export async function writeOffMinutesAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const supabase = await createClient();
+
+  const subId = String(formData.get("subscriptionId") ?? "");
+  const minutes = Math.trunc(Number(formData.get("minutes")));
+  const date = String(formData.get("date") ?? "").trim();
+  const instructorId = String(formData.get("instructorId") ?? "");
+  if (!subId || !Number.isFinite(minutes) || minutes <= 0) {
+    return { error: "Минуты — целое число больше нуля." };
+  }
+  if (!DAY_RE.test(date)) return { error: "Укажите дату проката." };
+
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("id, client_id, total_minutes, status")
+    .eq("id", subId)
+    .maybeSingle();
+  if (!sub) return { error: "Абонемент не найден." };
+  if (sub.status === "cancelled") {
+    return { error: "Абонемент отменён — списывать с него нельзя." };
+  }
+
+  // В минус не уходим (то же правило, что у инструктора): превышение
+  // оформляется отдельной сессией по прайсу проката.
+  const left = await minutesLeft(supabase, sub);
+  if (minutes > left) {
+    return { error: `Остаток ${left} мин — списать ${minutes} нельзя.` };
+  }
+
+  const { error } = await supabase.from("sessions").insert({
+    client_id: sub.client_id,
+    subscription_id: sub.id,
+    minutes_used: minutes,
+    amount: 0, // прокат по абонементу — деньги получены при его продаже
+    instructor_id: instructorId || null,
+    created_by: admin.id,
+    date,
+  });
+  if (error) return { error: `Не удалось списать: ${error.message}` };
+
+  await recalcSubscriptionStatus(supabase, subId);
+
+  revalidatePath("/", "layout");
+  redirect("/admin/subscriptions");
+}
+
 export async function adjustMinutesAction(
   _prev: ActionState,
   formData: FormData,
