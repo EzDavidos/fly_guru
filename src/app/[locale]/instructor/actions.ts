@@ -292,6 +292,13 @@ export async function recordClientAction(
       .eq("id", bookingId);
   }
 
+  // Сбрасываем кэш страниц перед уходом на экран «Готово» (пачка №6, п.3).
+  // Без этого инструктор, вернувшийся со страницы «Готово» назад к «Записям»,
+  // видел сохранённую браузером копию списка — заявка, которую он только что
+  // закрыл, оставалась в ленте до ручного обновления. На телефоне это заметнее
+  // всего: там кнопкой «назад» пользуются постоянно.
+  revalidatePath("/", "layout");
+
   const params = new URLSearchParams({
     type: "session",
     name,
@@ -373,6 +380,8 @@ export async function sellSubscriptionAction(
   // Членство добавляется вручную на вкладке «Члены клуба» (вернём авто-выдачу,
   // когда клуб оформим целиком).
 
+  revalidatePath("/", "layout"); // см. комментарий в recordClientAction
+
   const params = new URLSearchParams({ type: "subscription", name });
   if (paid) params.set("paid", "1");
   if (clientResult.existingName) params.set("existing", clientResult.existingName);
@@ -435,6 +444,8 @@ export async function writeOffAction(
   if (left - minutes === 0) {
     await supabase.from("subscriptions").update({ status: "used_up" }).eq("id", sub.id);
   }
+
+  revalidatePath("/", "layout"); // см. комментарий в recordClientAction
 
   const params = new URLSearchParams({
     type: "writeoff",
