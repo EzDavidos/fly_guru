@@ -534,14 +534,28 @@ export async function adminSellSubscriptionAction(
   // Минуты живут 3 месяца С ДАТЫ ПРОДАЖИ (в т.ч. прошлой). paid_at — только
   // при полученной оплате: от месяца оплаты зависят выручка и комиссия.
   const paid = formData.get("paid") === "on";
-  const { error: subError } = await supabase.from("subscriptions").insert({
+  // Чем заплатили — спрашиваем ровно при полученной оплате (см. форму).
+  const paymentMethodId =
+    String(formData.get("paymentMethodId") ?? "").trim() || null;
+  if (paid && !paymentMethodId) return { error: "Укажите формат оплаты." };
+
+  const row = {
     client_id: clientId,
     sold_by: sellerId,
     price,
     sold_at: soldAt,
     expires_at: subscriptionExpiry(new Date(soldAt)).toISOString(),
     paid_at: paid ? soldAt : null,
-  });
+    payment_method_id: paymentMethodId,
+  };
+  let { error: subError } = await supabase.from("subscriptions").insert(row);
+  // До миграции 0025 колонки payment_method_id нет — не роняем продажу из-за
+  // неё, сохраняем абонемент без способа оплаты (см. кабинет инструктора).
+  if (subError?.code === "PGRST204") {
+    const legacy: Partial<typeof row> = { ...row };
+    delete legacy.payment_method_id;
+    ({ error: subError } = await supabase.from("subscriptions").insert(legacy));
+  }
   if (subError) return { error: `Не удалось создать абонемент: ${subError.message}` };
 
   // Продажа из заявки на абонемент (кнопка «Продать абонемент» в ленте заявок):
@@ -552,7 +566,11 @@ export async function adminSellSubscriptionAction(
   if (bookingId) {
     await supabase
       .from("bookings")
-      .update({ status: "done", client_id: clientId })
+      .update({
+        status: "done",
+        client_id: clientId,
+        payment_method_id: paymentMethodId,
+      })
       .eq("id", bookingId);
   }
 

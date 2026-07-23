@@ -9,6 +9,7 @@ import {
   togglePaidAction,
 } from "../actions";
 import { ConfirmSubmit } from "../ConfirmSubmit";
+import { getActiveDict } from "@/lib/dictionaries";
 import { SellSubscriptionForm, AdjustMinutesForm } from "./SubscriptionForms";
 
 export const metadata: Metadata = { title: "Админка · Абонементы" };
@@ -50,11 +51,15 @@ function SubscriptionCard({
   left,
   history,
   today,
+  paymentName,
 }: {
   s: SubRow;
   left: number;
   history: HistoryItem[];
   today: string;
+  // Чем заплатили (0025). undefined — миграция ещё не накатана или продажа
+  // прошла до неё: тогда блок просто не показываем.
+  paymentName?: string;
 }) {
   // Отменённый — продажа не состоялась (п.13). Проверяем первым: у него могли
   // и минуты кончиться, и срок выйти, но человеку важно одно — он отменён.
@@ -109,6 +114,15 @@ function SubscriptionCard({
           Остаток <span className="font-bold text-ink">{left} мин</span> из{" "}
           {s.total_minutes} · истекает {fmtDay(s.expires_at)}
         </p>
+
+        {/* Чем заплатили — той же плашкой, что в ленте заявок, чтобы способ
+            оплаты выглядел одинаково везде. */}
+        {paymentName && !cancelled && (
+          <p className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-bold text-emerald-600">
+            <span aria-hidden>💵</span>
+            Оплата: {paymentName}
+          </p>
+        )}
 
         {/* Отметка оплаты. У отменённого её нет: пока он в отменённых, деньги
             не должны попадать ни в выручку, ни в комиссию продавца. */}
@@ -259,7 +273,7 @@ export default async function AdminSubscriptionsPage({
     subsQuery = subsQuery.eq("status", "active");
   }
 
-  const [subsRes, clientsRes, staffRes] = await Promise.all([
+  const [subsRes, clientsRes, staffRes, paymentMethods] = await Promise.all([
     subsQuery,
     supabase.from("clients").select("id, name, phone").order("name").limit(1000),
     supabase
@@ -267,10 +281,26 @@ export default async function AdminSubscriptionsPage({
       .select("id, name")
       .in("role", ["instructor", "admin"])
       .order("name"),
+    getActiveDict(supabase, "payment_methods"),
   ]);
 
   const subs = (subsRes.data ?? []) as unknown as SubRow[];
   const ids = subs.map((s) => s.id);
+
+  // Способ оплаты (0025) тянем ОТДЕЛЬНЫМ запросом, а не в общем select: пока
+  // миграция не накатана, колонки нет — и такой select уронил бы всю страницу
+  // абонементов. Здесь же ошибка просто оставит блок оплаты пустым.
+  const paymentBySub = new Map<string, string>();
+  if (ids.length) {
+    const { data: payRows } = await supabase
+      .from("subscriptions")
+      .select("id, payment:payment_methods(name)")
+      .in("id", ids);
+    for (const r of payRows ?? []) {
+      const name = (r.payment as unknown as { name: string } | null)?.name;
+      if (name) paymentBySub.set(r.id as string, name);
+    }
+  }
 
   // Балансы и история — двумя батч-запросами на весь список сразу.
   const [usedRes, adjRes] = ids.length
@@ -350,6 +380,7 @@ export default async function AdminSubscriptionsPage({
             clients={clientsRes.data ?? []}
             staff={staffRes.data ?? []}
             today={today}
+            paymentMethods={paymentMethods}
             prefill={bookingPrefill}
           />
         </div>
@@ -396,6 +427,7 @@ export default async function AdminSubscriptionsPage({
             left={leftOf(s)}
             history={historyBySub.get(s.id) ?? []}
             today={today}
+            paymentName={paymentBySub.get(s.id)}
           />
         ))}
       </div>

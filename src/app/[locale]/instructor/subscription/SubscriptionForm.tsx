@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { sellSubscriptionAction, type ActionState } from "../actions";
 
 const inputClass =
@@ -13,11 +13,20 @@ export interface SubscriptionPrefill {
   telegram: string | null;
 }
 
-export function SubscriptionForm({ prefill }: { prefill?: SubscriptionPrefill }) {
+export function SubscriptionForm({
+  prefill,
+  paymentMethods,
+}: {
+  prefill?: SubscriptionPrefill;
+  paymentMethods: { id: string; name: string }[];
+}) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     sellSubscriptionAction,
     { error: null },
   );
+  // Флажок оплаты включён по умолчанию — значит и способ оплаты спрашиваем
+  // сразу; снял флажок (клиент платит позже) — поле прячется.
+  const [paid, setPaid] = useState(true);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -64,13 +73,35 @@ export function SubscriptionForm({ prefill }: { prefill?: SubscriptionPrefill })
         <input
           type="checkbox"
           name="paid"
-          defaultChecked
+          checked={paid}
+          onChange={(e) => setPaid(e.target.checked)}
           className="h-5 w-5 accent-[var(--color-accent,#0ea5e9)]"
         />
         <span className="text-sm font-medium">
           Оплата получена (QR / крипта / наличные)
         </span>
       </label>
+
+      {paid && (
+        <div>
+          <label htmlFor="paymentMethodId" className="mb-1 block text-sm font-medium">
+            Формат оплаты *
+          </label>
+          <select
+            id="paymentMethodId"
+            name="paymentMethodId"
+            required
+            className={inputClass}
+          >
+            <option value="">Выберите…</option>
+            {paymentMethods.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <button
         type="submit"

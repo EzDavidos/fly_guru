@@ -33,17 +33,22 @@ export function SellSubscriptionForm({
   clients,
   staff,
   today,
+  paymentMethods,
   prefill,
 }: {
   clients: ClientOption[];
   staff: Option[];
   today: string;
+  paymentMethods: Option[];
   prefill?: SubscriptionPrefill;
 }) {
   const [state, formAction, pending] = useActionState(adminSellSubscriptionAction, {
     error: null,
   });
   const [clientId, setClientId] = useState(prefill?.clientId ?? "");
+  // Способ оплаты спрашиваем только когда деньги уже получены: при продаже
+  // «в долг» он ещё неизвестен, и заставлять выбирать наугад — врать отчёту.
+  const [paid, setPaid] = useState(false);
 
   return (
     <form action={formAction} className="space-y-3">
@@ -130,10 +135,30 @@ export function SellSubscriptionForm({
           />
         </label>
         <label className="flex items-center gap-2 pb-2 text-sm">
-          <input type="checkbox" name="paid" className="h-4 w-4 accent-primary" />
+          <input
+            type="checkbox"
+            name="paid"
+            checked={paid}
+            onChange={(e) => setPaid(e.target.checked)}
+            className="h-4 w-4 accent-primary"
+          />
           Оплата получена
         </label>
       </div>
+
+      {paid && (
+        <label className="block text-xs text-muted">
+          Формат оплаты
+          <select name="paymentMethodId" required className={`mt-1 ${inputClass}`}>
+            <option value="">Выберите…</option>
+            {paymentMethods.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}
 

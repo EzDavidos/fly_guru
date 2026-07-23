@@ -1,6 +1,7 @@
 import { formatVnd } from "@/content/services";
 import { getSiteServices, pickService } from "@/lib/services";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveDict } from "@/lib/dictionaries";
 import { SubscriptionForm } from "./SubscriptionForm";
 
 // Продажа абонемента: 300 минут / 6 млн ₫, минуты живут 3 месяца.
@@ -14,6 +15,7 @@ export default async function SubscriptionPage({
 }) {
   const { booking: bookingId } = await searchParams;
   const sub = pickService(await getSiteServices(), "subscription");
+  const paymentMethods = await getActiveDict(await createClient(), "payment_methods");
 
   // Пришли из заявки на абонемент («Продать абонемент» в списке записей):
   // тянем контакты клиента, чтобы форма открылась заполненной, а продажа
@@ -50,7 +52,7 @@ export default async function SubscriptionPage({
         </p>
       )}
       <div className="mt-6">
-        <SubscriptionForm prefill={prefill} />
+        <SubscriptionForm prefill={prefill} paymentMethods={paymentMethods} />
       </div>
       <p className="mt-4 text-xs text-muted">
         Если клиент ещё не обучен, первые 60 минут абонемента — обучающее занятие.

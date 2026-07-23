@@ -309,8 +309,14 @@ export async function sellSubscriptionAction(
   const paid = formData.get("paid") === "on";
   // Пришли из заявки на абонемент — закроем её после продажи (пачка №5, п.11).
   const bookingId = String(formData.get("bookingId") ?? "") || null;
+  // Чем заплатили. Обязателен ровно тогда, когда деньги получены: продажа
+  // «оплатит позже» способа оплаты ещё не имеет. Проверяем на сервере — в
+  // разметке required обходится, а дыру в отчёте потом не залатать.
+  const paymentMethodId =
+    String(formData.get("paymentMethodId") ?? "").trim() || null;
 
   if (!name || !phone) return { error: "Заполните имя и телефон." };
+  if (paid && !paymentMethodId) return { error: "Укажите формат оплаты." };
 
   const clientResult = await findOrCreateClient(supabase, user, {
     name,
@@ -324,19 +330,35 @@ export async function sellSubscriptionAction(
   // total_minutes (300) и price (6 млн) заданы default'ами в схеме.
   // Минуты живут 3 месяца с продажи. paid_at пишем только при полученной
   // оплате — от него зависит комиссия инструктора (см. 0002).
-  const { error: subError } = await supabase.from("subscriptions").insert({
+  const row = {
     client_id: clientId,
     sold_by: user.id,
     expires_at: subscriptionExpiry().toISOString(),
     paid_at: paid ? new Date().toISOString() : null,
-  });
+    payment_method_id: paymentMethodId,
+  };
+  let { error: subError } = await supabase.from("subscriptions").insert(row);
+  // Миграцию 0025 ещё не накатили — колонки payment_method_id нет. Продажу
+  // из-за этого не роняем: пишем абонемент без способа оплаты (его потом
+  // проставит админ), иначе деплой до миграции убил бы весь поток продаж.
+  if (subError?.code === "PGRST204") {
+    const legacy: Partial<typeof row> = { ...row };
+    delete legacy.payment_method_id;
+    ({ error: subError } = await supabase.from("subscriptions").insert(legacy));
+  }
   if (subError) return { error: `Не удалось создать абонемент: ${subError.message}` };
 
-  // Заявка доведена до продажи → закрываем её и привязываем клиента.
+  // Заявка доведена до продажи → закрываем её и привязываем клиента. Способ
+  // оплаты уезжает в заявку: админ видит его прямо в ленте, а не выбирает
+  // заново руками.
   if (bookingId) {
     await supabase
       .from("bookings")
-      .update({ status: "done", client_id: clientId })
+      .update({
+        status: "done",
+        client_id: clientId,
+        payment_method_id: paymentMethodId,
+      })
       .eq("id", bookingId);
   }
 
