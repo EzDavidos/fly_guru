@@ -43,6 +43,8 @@ interface BookingRow {
   created_at: string;
   services: { name: string; category: string } | null;
   accepted: { name: string } | null;
+  payment_method_id: string | null;
+  payment: { name: string } | null;
 }
 
 const TERMINAL = ["done", "cancelled", "archived"];
@@ -86,6 +88,7 @@ function BookingCard({
   today,
   hasPendingReward,
   refOwner,
+  paymentMethods,
 }: {
   b: BookingRow;
   today: string;
@@ -93,6 +96,7 @@ function BookingCard({
   // Владелец реф-ссылки заявки: агент (скидка + награда) или инструктор
   // (просто «записался к нему»). undefined — код есть, а владельца не нашли.
   refOwner: RefOwner | undefined;
+  paymentMethods: { id: string; name: string }[];
 }) {
   const badge = statusBadge(b);
   const terminal = TERMINAL.includes(b.status);
@@ -165,6 +169,16 @@ function BookingCard({
           )}
         </div>
 
+        {/* Чем платят. Отдельной заметной плашкой, а не строчкой в общем
+            списке: способ оплаты ищут глазами (пачка №5, чек-лист админки).
+            Проставляется сам, когда заявку доводят до занятия. */}
+        {b.payment && (
+          <p className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-bold text-emerald-600">
+            <span aria-hidden>💵</span>
+            Оплата: {b.payment.name}
+          </p>
+        )}
+
         {/* Атрибуция: откуда пришёл клиент */}
         {(b.src || b.ref_code || utmEntries.length > 0) && (
           <div className="mt-2 space-y-0.5 rounded-xl bg-line/30 px-3 py-2 text-xs text-muted">
@@ -222,6 +236,31 @@ function BookingCard({
               />
             </label>
           </div>
+          {/* Формат оплаты можно проставить руками (договорились по телефону)
+              или поправить — сам он приезжает при проведении заявки. */}
+          <label className="mt-2 block text-xs text-muted">
+            Формат оплаты
+            <select
+              name="paymentMethodId"
+              defaultValue={b.payment_method_id ?? ""}
+              className={`mt-1 ${inputClass}`}
+            >
+              <option value="">— не указан —</option>
+              {paymentMethods.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+              {/* Способ мог быть скрыт в справочнике уже после оплаты — иначе
+                  select не нашёл бы своё значение и сохранение затёрло бы его. */}
+              {b.payment_method_id &&
+                !paymentMethods.some((p) => p.id === b.payment_method_id) && (
+                  <option value={b.payment_method_id}>
+                    {b.payment?.name ?? "прежний способ"}
+                  </option>
+                )}
+            </select>
+          </label>
           <label className="mt-2 block text-xs text-muted">
             Заметка (пожелания клиента, договорённости — видна инструкторам)
             <textarea
@@ -372,7 +411,7 @@ export default async function AdminBookingsPage({
   const { data } = await supabase
     .from("bookings")
     .select(
-      "id, booking_no, client_name, phone, telegram_username, preferred_date, scheduled_time, age, weight, status, pinned, ref_code, src, utm, internal_note, client_id, rescheduled_at, created_at, services(name, category), accepted:users!accepted_by(name)",
+      "id, booking_no, client_name, phone, telegram_username, preferred_date, scheduled_time, age, weight, status, pinned, ref_code, src, utm, internal_note, client_id, rescheduled_at, created_at, payment_method_id, services(name, category), accepted:users!accepted_by(name), payment:payment_methods(name)",
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -474,6 +513,7 @@ export default async function AdminBookingsPage({
             today={today}
             hasPendingReward={!!b.client_id && pendingRewardClients.has(b.client_id)}
             refOwner={b.ref_code ? refOwners.get(b.ref_code) : undefined}
+            paymentMethods={paymentMethods}
           />
         ))}
       </div>

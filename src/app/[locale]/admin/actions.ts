@@ -45,6 +45,11 @@ function bookingFields(formData: FormData) {
     age: intOrNull(formData.get("age")),
     weight: intOrNull(formData.get("weight")),
     internal_note: String(formData.get("note") ?? "").trim() || null,
+    // Как договорились платить. Проставляется руками здесь и автоматически,
+    // когда заявку доводят до занятия или абонемента (там способ оплаты
+    // обязателен) — чтобы в ленте заявок было видно, чем реально заплатили.
+    payment_method_id:
+      String(formData.get("paymentMethodId") ?? "").trim() || null,
   };
 }
 
@@ -144,9 +149,8 @@ export async function createBookingAction(
       preferred_date: preferredDate || null,
       status: confirmed ? "confirmed" : "new",
       src: channel,
-      // Формат оплаты в заявке необязателен — клиент ещё не платил (пак A).
-      payment_method_id:
-        String(formData.get("paymentMethodId") ?? "").trim() || null,
+      // Формат оплаты сюда приходит из bookingFields: в заявке он
+      // необязателен — клиент ещё не платил (пак A).
       ...bookingFields(formData),
     })
     .select("id")
@@ -407,9 +411,15 @@ export async function createSessionAction(
     if (rewardError) console.error("[admin] reward insert error:", rewardError.message);
   }
   if (bookingId) {
+    // Способ оплаты возвращаем в заявку: в ленте заявок сразу видно, чем
+    // клиент расплатился, без похода в сессии.
     await supabase
       .from("bookings")
-      .update({ status: "done", client_id: clientId })
+      .update({
+        status: "done",
+        client_id: clientId,
+        payment_method_id: paymentMethodId,
+      })
       .eq("id", bookingId);
   }
 

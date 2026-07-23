@@ -271,11 +271,17 @@ export async function recordClientAction(
     }
   }
 
-  // Заявка доведена до занятия → закрываем её и привязываем клиента.
+  // Заявка доведена до занятия → закрываем её и привязываем клиента. Заодно
+  // возвращаем в заявку способ оплаты, которым клиент расплатился: админу
+  // видно это прямо в ленте заявок, не открывая сессии.
   if (bookingId) {
     await supabase
       .from("bookings")
-      .update({ status: "done", client_id: clientId })
+      .update({
+        status: "done",
+        client_id: clientId,
+        payment_method_id: paymentMethodId,
+      })
       .eq("id", bookingId);
   }
 
