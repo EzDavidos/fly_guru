@@ -48,6 +48,9 @@ export async function sendBookingNotification(
   if (b.comment) lines.push(`💬 Комментарий: ${b.comment}`);
   if (b.refLine) lines.push(`🎟️ ${b.refLine}`);
   if (b.src) lines.push(`🧭 Источник: ${b.src}`);
+  // Ссылка на ленту заявок — как «Принять» у инструкторов: из чата сразу
+  // попадаешь туда, где заявку обрабатывают, а не ищешь адрес по закладкам.
+  lines.push("", `Открыть: ${SITE_URL}/admin/bookings`);
 
   await sendTelegram(chatId, lines.join("\n"));
 }
