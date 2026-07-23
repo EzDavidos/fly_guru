@@ -15,6 +15,7 @@ import { firstBasicTrainingByPhone } from "@/lib/agentReward";
 import { SaveForm } from "../SaveForm";
 import { getActiveDict } from "@/lib/dictionaries";
 import { BookingCreateForm } from "./BookingCreateForm";
+import { NATIVE_PICKER } from "@/components/cabinet/fieldClasses";
 
 export const metadata: Metadata = { title: "Админка · Заявки" };
 
@@ -374,9 +375,16 @@ function BookingCard({
         {!terminal && (
           <form action={rescheduleAction} className="mt-3 flex items-end gap-2">
             <input type="hidden" name="id" value={b.id} />
-            <label className="flex-1 text-xs text-muted">
+            {/* min-w-0: иначе нативный датапикер не даёт ячейке ужаться и
+                выталкивает кнопку «Перенести» за экран (см. NATIVE_PICKER). */}
+            <label className="min-w-0 flex-1 text-xs text-muted">
               Перенести на
-              <input type="date" name="newDate" required className={`mt-1 ${inputClass}`} />
+              <input
+                type="date"
+                name="newDate"
+                required
+                className={`mt-1 ${NATIVE_PICKER} ${inputClass}`}
+              />
             </label>
             <label className="w-24 text-xs text-muted">
               Время

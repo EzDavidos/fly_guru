@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { createSessionAction } from "../actions";
 import { vnd } from "@/lib/stats";
+import { NATIVE_PICKER } from "@/components/cabinet/fieldClasses";
 
 // Форма «создать сессию задним числом». Клиентский компонент ради двух вещей:
 // показать ошибку валидации без перезагрузки (useActionState) и подсказать
@@ -45,8 +46,10 @@ export function SessionCreateForm({
 
   return (
     <form action={formAction} className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs text-muted">
+      {/* items-end + min-w-0: подпись «Дата (можно прошлую)» на телефоне
+          переносится, а нативный датапикер распирает свою колонку. */}
+      <div className="grid grid-cols-2 items-end gap-2">
+        <label className="min-w-0 text-xs text-muted">
           Дата (можно прошлую)
           <input
             type="date"
@@ -54,10 +57,10 @@ export function SessionCreateForm({
             defaultValue={today}
             max={today}
             required
-            className={`mt-1 ${inputClass}`}
+            className={`mt-1 ${NATIVE_PICKER} ${inputClass}`}
           />
         </label>
-        <label className="text-xs text-muted">
+        <label className="min-w-0 text-xs text-muted">
           Инструктор
           <select name="instructorId" className={`mt-1 ${inputClass}`}>
             {staff.map((u) => (

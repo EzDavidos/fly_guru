@@ -7,6 +7,7 @@ import {
   writeOffMinutesAction,
 } from "../actions";
 import { PaymentMethodField } from "@/components/cabinet/PaymentMethodField";
+import { NATIVE_PICKER } from "@/components/cabinet/fieldClasses";
 
 // Клиентские кусочки страницы абонементов: две формы с ошибками без
 // перезагрузки (useActionState). Кнопка с confirm() — в ../ConfirmSubmit.
@@ -106,8 +107,10 @@ export function SellSubscriptionForm({
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs text-muted">
+      {/* items-end: подпись «Продал (15% …)» на телефоне переносится на вторую
+          строку, и без выравнивания поля разъезжаются по вертикали. */}
+      <div className="grid grid-cols-2 items-end gap-2">
+        <label className="min-w-0 text-xs text-muted">
           Продал (15% в общий котёл после оплаты)
           <select name="sellerId" className={`mt-1 ${inputClass}`}>
             {staff.map((u) => (
@@ -117,7 +120,7 @@ export function SellSubscriptionForm({
             ))}
           </select>
         </label>
-        <label className="text-xs text-muted">
+        <label className="min-w-0 text-xs text-muted">
           Дата продажи
           <input
             type="date"
@@ -125,7 +128,7 @@ export function SellSubscriptionForm({
             defaultValue={today}
             max={today}
             required
-            className={`mt-1 ${inputClass}`}
+            className={`mt-1 ${NATIVE_PICKER} ${inputClass}`}
           />
         </label>
       </div>
@@ -196,8 +199,8 @@ export function WriteOffMinutesForm({
   return (
     <form action={formAction} className="mt-3 space-y-2">
       <input type="hidden" name="subscriptionId" value={subscriptionId} />
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <label className="text-xs text-muted">
+      <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-3">
+        <label className="min-w-0 text-xs text-muted">
           Откатал, мин
           <input
             type="number"
@@ -208,7 +211,7 @@ export function WriteOffMinutesForm({
             className={`mt-1 ${inputClass}`}
           />
         </label>
-        <label className="text-xs text-muted">
+        <label className="min-w-0 text-xs text-muted">
           Дата проката
           <input
             type="date"
@@ -216,10 +219,10 @@ export function WriteOffMinutesForm({
             defaultValue={today}
             max={today}
             required
-            className={`mt-1 ${inputClass}`}
+            className={`mt-1 ${NATIVE_PICKER} ${inputClass}`}
           />
         </label>
-        <label className="col-span-2 text-xs text-muted sm:col-span-1">
+        <label className="col-span-2 min-w-0 text-xs text-muted sm:col-span-1">
           Инструктор
           <select name="instructorId" className={`mt-1 ${inputClass}`}>
             <option value="">— не указан —</option>

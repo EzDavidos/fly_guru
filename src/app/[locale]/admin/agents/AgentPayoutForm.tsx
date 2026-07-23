@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { payAgentAction } from "../actions";
 import type { DictItem } from "@/lib/dictionaries";
+import { NATIVE_PICKER } from "@/components/cabinet/fieldClasses";
 
 // Форма «выплачено агенту» (пачка №5, п.7): сумма, способ, дата, комментарий.
 // Клиентский компонент ради ошибки под кнопкой без перезагрузки (useActionState).
@@ -31,7 +32,7 @@ export function AgentPayoutForm({
   return (
     <form action={formAction} className="mt-3 space-y-2">
       <input type="hidden" name="agentId" value={agentId} />
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-3">
         <label className="text-xs text-muted">
           Сумма, ₫
           <input
@@ -54,7 +55,7 @@ export function AgentPayoutForm({
             ))}
           </select>
         </label>
-        <label className="text-xs text-muted">
+        <label className="min-w-0 text-xs text-muted">
           Когда
           <input
             type="date"
@@ -62,7 +63,7 @@ export function AgentPayoutForm({
             defaultValue={today}
             max={today}
             required
-            className={`mt-1 ${inputClass}`}
+            className={`mt-1 ${NATIVE_PICKER} ${inputClass}`}
           />
         </label>
       </div>

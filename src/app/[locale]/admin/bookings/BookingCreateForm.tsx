@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { createBookingAction } from "../actions";
 import { MANUAL_CHANNELS } from "@/lib/channels";
+import { NATIVE_PICKER } from "@/components/cabinet/fieldClasses";
 
 // Форма «Новая заявка»: клиент позвонил / написал / пришёл ногами. Заявку с
 // сайта создаёт публичная форма, а этот поток раньше в CRM не попадал вообще.
@@ -17,11 +18,9 @@ export interface ServiceOption {
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
 
-// Нативные поля даты и времени: то же оформление, что у остальных, плюс сброс
-// системного вида. Без него Safari на iOS держит поле своей «естественной»
-// ширины, не слушая w-full, — и дата наезжала на время. Префиксную запись
-// оставляем ради старых iOS, где безпрефиксный appearance ещё не работал.
-const nativeFieldClass = `min-w-0 appearance-none [-webkit-appearance:none] ${inputClass}`;
+// Нативные поля даты и времени: то же оформление, что у остальных, плюс общий
+// сброс системного вида (см. NATIVE_PICKER — там объяснение).
+const nativeFieldClass = `${NATIVE_PICKER} ${inputClass}`;
 
 export function BookingCreateForm({
   services,

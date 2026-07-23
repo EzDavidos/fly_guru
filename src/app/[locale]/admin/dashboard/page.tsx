@@ -10,6 +10,7 @@ import {
 } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
 import { MANUAL_CHANNELS } from "@/lib/channels";
+import { NATIVE_PICKER } from "@/components/cabinet/fieldClasses";
 
 export const metadata: Metadata = { title: "Админка · Статистика" };
 
@@ -420,7 +421,7 @@ export default async function AdminDashboardPage({
               name="from"
               defaultValue={range.fromDay}
               max={today}
-              className="mt-1 rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+              className={`mt-1 ${NATIVE_PICKER} rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary`}
             />
           </label>
           <label className="flex flex-col items-start text-xs text-muted">
@@ -430,7 +431,7 @@ export default async function AdminDashboardPage({
               name="to"
               defaultValue={lastDay}
               max={today}
-              className="mt-1 rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+              className={`mt-1 ${NATIVE_PICKER} rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary`}
             />
           </label>
         </div>

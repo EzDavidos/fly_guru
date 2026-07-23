@@ -10,6 +10,7 @@ import {
 } from "@/lib/dates";
 import { SHIFT_PAY, getInstructorStats, vnd, type StatsRange } from "@/lib/stats";
 import { setTourApprovedAction } from "../actions";
+import { NATIVE_PICKER } from "@/components/cabinet/fieldClasses";
 
 // «Статистика» за произвольный период. По умолчанию — текущий месяц
 // (с 1-го числа); кнопка «Текущий месяц» всегда возвращает к нему, даже если
@@ -113,7 +114,7 @@ export default async function StatsPage({
               name="from"
               defaultValue={range.fromDay}
               max={today}
-              className="mt-1 rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+              className={`mt-1 ${NATIVE_PICKER} rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary`}
             />
           </label>
           <label className="flex flex-col items-start text-xs text-muted">
@@ -123,7 +124,7 @@ export default async function StatsPage({
               name="to"
               defaultValue={lastDay}
               max={today}
-              className="mt-1 rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+              className={`mt-1 ${NATIVE_PICKER} rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary`}
             />
           </label>
         </div>
