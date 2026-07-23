@@ -148,10 +148,9 @@ function AgentCard({
               </a>
             </p>
           )}
-          <p>
-            Ожидает: <span className="font-bold text-ink">{vnd(stats.pendingSum)}</span>
-            {stats.pendingCount > 0 && ` (${stats.pendingCount})`}
-          </p>
+          {/* Строки «Ожидает» здесь больше нет: награда пишется сразу
+              подтверждённой, и висящая рядом вторая сумма только путала
+              (пачка №6, п.5). Деньги агента целиком — в блоке ниже. */}
           <p>
             Подтверждено:{" "}
             <span className="font-bold text-ink">{vnd(stats.confirmedSum)}</span>

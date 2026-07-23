@@ -16,6 +16,7 @@ import { vnToday, subscriptionExpiry } from "@/lib/dates";
 import { minutesLeft } from "@/lib/subscriptions";
 import { parseVnd } from "@/lib/money";
 import { checkPhoto } from "@/lib/photos";
+import { agentRewardApplies, applyRefDiscount } from "@/lib/agentReward";
 
 // Server actions кабинета инструктора. Общий принцип безопасности:
 // instructor_id / sold_by / created_by берутся из СЕССИИ на сервере (user.id),
@@ -26,9 +27,8 @@ export interface ActionState {
   error: string | null;
 }
 
-// Скидка по агентской реф-ссылке — 10% на базовое обучение. Была фиксированной
-// (200к), начальник перевёл на процент (пак D, пункт 2).
-const REF_DISCOUNT_RATE = 0.1;
+// Скидка по агентской реф-ссылке и правила награды агента живут в
+// lib/agentReward: их должны одинаково понимать и кабинет, и админка.
 
 async function requireStaff(): Promise<AppUser> {
   const user = await getAppUser();
@@ -220,7 +220,7 @@ export async function recordClientAction(
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, name, price, category")
+    .select("id, name, price, category, code")
     .eq("id", serviceId)
     .maybeSingle();
   if (!service) return { error: "Услуга не найдена." };
@@ -230,12 +230,18 @@ export async function recordClientAction(
     return { error: "Абонемент оформляется через «Продажу абонемента»." };
   }
 
-  // Чек. Скидка −10% действует только по коду АГЕНТА и только на базовое
-  // обучение. Личный код инструктора (c2) в booking.ref_code скидку НЕ даёт —
-  // поэтому завязываемся на распознанного агента, а не на сам факт ref_code.
-  let amount = Number(service.price ?? 0);
-  const discounted = Boolean(agent) && service.category === "training";
-  if (discounted) amount = Math.max(0, amount - Math.round(amount * REF_DISCOUNT_RATE));
+  // Заработал ли агент на этом занятии: только первое базовое обучение
+  // клиента (в т.ч. парное). Личный код инструктора скидки и награды не даёт —
+  // поэтому смотрим на распознанного агента, а не на сам факт ref_code.
+  // Одно решение на троих: скидка клиенту, комиссия на сессии, награда агенту.
+  const rewarded = await agentRewardApplies(supabase, {
+    hasAgent: Boolean(agent),
+    serviceCode: service.code as string | null,
+    clientId,
+  });
+
+  const amount = applyRefDiscount(Number(service.price ?? 0), rewarded);
+  const discounted = rewarded;
 
   // Комиссию агента фиксируем на сессии: из неё вычтется база инструктора
   // (15% с чека минус комиссия). См. миграцию 0021.
@@ -245,23 +251,24 @@ export async function recordClientAction(
     instructor_id: user.id,
     date,
     amount,
-    agent_commission: agent ? agent.commission_fixed : 0,
+    agent_commission: rewarded ? agent!.commission_fixed : 0,
     payment_method_id: paymentMethodId,
     created_by: user.id,
   });
   if (sessionError) return { error: `Не удалось записать: ${sessionError.message}` };
 
-  // Награда агенту. Занятие проведено и оплачено прямо сейчас — это и есть
-  // подтверждение, поэтому пишем сразу `confirmed` (иначе награда зависала бы
-  // pending, клиент везде «оплатил», а в расчёте месяца агенту 0). Размер
-  // фиксированный (commission_fixed), считается независимо от чека.
-  if (agent) {
+  // Награда агенту — за первое базовое обучение приведённого клиента. Занятие
+  // проведено и оплачено прямо сейчас — это и есть подтверждение, поэтому
+  // пишем сразу `confirmed` (иначе награда зависала бы pending, клиент везде
+  // «оплатил», а в расчёте месяца агенту 0). Размер фиксированный
+  // (commission_fixed), считается независимо от чека.
+  if (rewarded) {
     const { error: rewardError } = await supabase.from("referral_rewards").insert({
       referrer_type: "agent",
-      referrer_id: agent.id,
+      referrer_id: agent!.id,
       client_id: clientId,
       reward_type: "money",
-      amount: agent.commission_fixed,
+      amount: agent!.commission_fixed,
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
     });

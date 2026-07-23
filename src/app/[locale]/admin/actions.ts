@@ -20,6 +20,7 @@ import { DICT_LABEL, type DictTable } from "@/lib/dictionaries";
 import type { EquipmentKind } from "@/lib/equipment";
 import { parseVnd } from "@/lib/money";
 import { checkPhoto } from "@/lib/photos";
+import { agentRewardApplies, applyRefDiscount } from "@/lib/agentReward";
 import type { ActionState } from "../instructor/actions";
 
 // Server actions админки: полный цикл заявки. Админ созванивается с гостем,
@@ -271,11 +272,8 @@ async function resolveClient(
   return { id: created.id };
 }
 
-// Скидка по агентской реф-ссылке — 10% на базовое обучение (как в кабинете
-// инструктора). Применяется, когда админ записывает клиента из заявки.
-// Раньше была фиксированной суммой (200к); начальник перевёл на процент, чтобы
-// скидка соразмерялась с ценой услуги (пак D, пункт 2).
-const REF_DISCOUNT_RATE = 0.1;
+// Скидка по агентской ссылке и условия награды агента — общие с кабинетом
+// инструктора, живут в lib/agentReward.
 
 // Создать сессию задним числом: инструктор забыл оформить занятие — админ
 // вносит его вручную на любую дату. Тем же экшеном пользуется админская
@@ -341,7 +339,7 @@ export async function createSessionAction(
 
   const { data: service } = await supabase
     .from("services")
-    .select("price, category")
+    .select("price, category, code")
     .eq("id", serviceId)
     .maybeSingle();
   if (!service) return { error: "Услуга не найдена." };
@@ -357,18 +355,20 @@ export async function createSessionAction(
   if ("error" in clientRes) return clientRes;
   const clientId = clientRes.id;
 
-  // Пустая сумма = по прайсу (с агентской скидкой −10% на базовое обучение);
-  // введённая вручную — важнее (админ решает: скидки, брони, доплаты).
+  // Заработал ли агент на этом занятии: только первое базовое обучение
+  // клиента (в т.ч. парное) — то же правило, что в кабинете инструктора.
+  const rewarded = await agentRewardApplies(supabase, {
+    hasAgent: Boolean(agent),
+    serviceCode: service.code as string | null,
+    clientId,
+  });
+
+  // Пустая сумма = по прайсу (со скидкой −10%, если она положена); введённая
+  // вручную — важнее (админ решает: скидки, брони, доплаты).
   const amountRaw = String(formData.get("amount") ?? "").trim();
-  let amount: number | null;
-  if (amountRaw) {
-    amount = parseVnd(amountRaw);
-  } else {
-    amount = Number(service.price ?? 0);
-    if (agent && service.category === "training") {
-      amount = Math.max(0, amount - Math.round(amount * REF_DISCOUNT_RATE));
-    }
-  }
+  const amount: number | null = amountRaw
+    ? parseVnd(amountRaw)
+    : applyRefDiscount(Number(service.price ?? 0), rewarded);
   if (amount === null) return { error: "Сумма — число в донгах, например 1 500 000." };
 
   // Формат оплаты (пак A, пункт 6). У админа обязателен так же, как у
@@ -377,7 +377,7 @@ export async function createSessionAction(
   if (!paymentMethodId) return { error: "Укажите формат оплаты." };
 
   // Комиссию агента фиксируем на сессии — из неё вычтется база инструктора
-  // (15% с чека минус комиссия). Ставим её при любом агентском занятии, даже
+  // (15% с чека минус комиссия). Ставим её там же, где положена награда, даже
   // если сумму админ ввёл руками: агент привёл клиента независимо от чека.
   const { error: insError } = await supabase.from("sessions").insert({
     client_id: clientId,
@@ -385,23 +385,24 @@ export async function createSessionAction(
     instructor_id: instructorId,
     date,
     amount,
-    agent_commission: agent ? agent.commission_fixed : 0,
+    agent_commission: rewarded ? agent!.commission_fixed : 0,
     payment_method_id: paymentMethodId,
     created_by: admin.id,
   });
   if (insError) return { error: `Не удалось создать сессию: ${insError.message}` };
 
-  // Награда агенту и закрытие заявки: запись доведена до оплаченного занятия.
-  // Оплата состоялась (сессия записана), поэтому награду пишем сразу
-  // `confirmed` датой сессии — она попадёт в расчёт того же месяца, что и
-  // выручка. Раньше висела pending, и в payroll агент оставался с 0.
-  if (agent) {
+  // Награда агенту (за первое базовое обучение клиента) и закрытие заявки:
+  // запись доведена до оплаченного занятия. Оплата состоялась (сессия
+  // записана), поэтому награду пишем сразу `confirmed` датой сессии — она
+  // попадёт в расчёт того же месяца, что и выручка. Раньше висела pending, и
+  // в payroll агент оставался с 0.
+  if (rewarded) {
     const { error: rewardError } = await supabase.from("referral_rewards").insert({
       referrer_type: "agent",
-      referrer_id: agent.id,
+      referrer_id: agent!.id,
       client_id: clientId,
       reward_type: "money",
-      amount: agent.commission_fixed,
+      amount: agent!.commission_fixed,
       status: "confirmed",
       confirmed_at: dayToIso(date),
     });
