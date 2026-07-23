@@ -6,10 +6,18 @@ import { getAttributionForBooking } from "@/lib/attribution";
 import { isValidPhone, PHONE_ERROR } from "@/lib/phone";
 
 // Услуга в том минимальном виде, что нужен форме: id (для базы) + название.
+// code — служебный ключ услуги из базы: по нему форма находит, что выбрать по
+// умолчанию, не завися от названий и порядка списка.
 export interface ServiceOption {
   id: string;
   name: string;
+  code?: string | null;
 }
+
+// Что подставляем гостю, если страница не попросила конкретную услугу. Список
+// приходит отсортированным по цене, поэтому «первая» — это самый дешёвый
+// детский тандем; людям почти всегда нужно базовое обучение (пачка №6, п.1).
+const DEFAULT_SERVICE_CODE = "basic-adult";
 
 interface BookingFormProps {
   services: ServiceOption[]; // список услуг для выпадающего списка (из базы)
@@ -166,7 +174,12 @@ export function BookingForm({ services, defaultServiceId, refCode, onSuccess }: 
         <select
           id="serviceId"
           name="serviceId"
-          defaultValue={defaultServiceId ?? services[0]?.id ?? ""}
+          defaultValue={
+            defaultServiceId ??
+            services.find((s) => s.code === DEFAULT_SERVICE_CODE)?.id ??
+            services[0]?.id ??
+            ""
+          }
           className={inputClass}
         >
           {services.map((s) => (

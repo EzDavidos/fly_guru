@@ -20,7 +20,7 @@ export async function getActiveServices(
   const supabase = createAdminClient();
   let query = supabase
     .from("services")
-    .select("id, name, category")
+    .select("id, name, category, code")
     .eq("active", true)
     .order("price", { ascending: true, nullsFirst: false });
 
@@ -31,7 +31,13 @@ export async function getActiveServices(
     console.error("[services] load error:", error.message);
     return [];
   }
-  return (data ?? []).map((s) => ({ id: s.id, name: s.name }));
+  // code нужен форме записи, чтобы выбрать услугу по умолчанию не «первую в
+  // списке» (список отсортирован по цене), а конкретное базовое обучение.
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    code: (s.code as string | null) ?? null,
+  }));
 }
 
 // Услуги для публичных страниц: тексты и описания — из контента

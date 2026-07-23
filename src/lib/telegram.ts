@@ -8,6 +8,10 @@
 // Если токен/чат не настроены — функция молча ничего не делает. Заявка при этом
 // всё равно сохраняется в базу. Уведомление — дополнение, не обязательное звено.
 
+// Боевой адрес школы. Держим одной константой: в ссылке «Принять» жил ещё
+// старый vercel-адрес, и инструкторы каждый раз уходили не туда (пачка №6, п.4).
+const SITE_URL = "https://www.flyguru.pro";
+
 interface BookingNotification {
   serviceName: string | null; // название услуги
   clientName: string;
@@ -67,7 +71,7 @@ export async function sendInstructorsBookingAlert(b: {
   if (b.serviceName) lines.push(`📋 ${b.serviceName}`);
   if (b.preferredDate) lines.push(`📅 ${b.preferredDate}`);
   if (b.scheduledTime) lines.push(`🕐 ${b.scheduledTime}`);
-  lines.push("", "Принять: https://fly-guru.vercel.app/instructor/bookings");
+  lines.push("", `Принять: ${SITE_URL}/instructor/bookings`);
 
   await sendTelegram(chatId, lines.join("\n"));
 }
@@ -75,7 +79,7 @@ export async function sendInstructorsBookingAlert(b: {
 // Напоминалка про смену в группу инструкторов (пак C). Конкретного человека не
 // тегаем — просто шлём ссылку на экран смены; кто на выходе, тот и откроет/
 // закроет. Крон дёргает это утром (open) и вечером (close).
-const SHIFT_URL = "https://www.flyguru.pro/instructor/shift";
+const SHIFT_URL = `${SITE_URL}/instructor/shift`;
 
 export async function sendShiftReminder(kind: "open" | "close"): Promise<void> {
   const chatId = process.env.TELEGRAM_INSTRUCTORS_CHAT_ID;
