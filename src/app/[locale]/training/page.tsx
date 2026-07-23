@@ -43,9 +43,23 @@ export default async function TrainingPage() {
                 Научитесь летать на электрофойле
               </h1>
               <p className="mt-4 max-w-lg text-lg text-muted">
-                Занятие длится 60 минут. 90% учеников встают на крыло уже на первом занятии,
-                до уверенного самостоятельного катания обычно 3–5 занятий.
+                90% учеников встают на крыло уже на первом занятии, и уверенно
+                самостоятельно держат баланс и скорость.
               </p>
+              {/* Сухие условия — отдельным блоком под основным текстом: их
+                  ищут глазами перед записью, в абзаце они терялись. */}
+              <dl className="mt-5 max-w-lg space-y-1.5 text-sm">
+                {[
+                  ["Длительность занятия", "60 мин"],
+                  ["Возраст", "от 8 лет (по одобрению инструктора)"],
+                  ["Вес", "до 130 кг"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex gap-2">
+                    <dt className="text-muted">{label}:</dt>
+                    <dd className="font-semibold">{value}</dd>
+                  </div>
+                ))}
+              </dl>
               <div className="mt-8">
                 <BookBtn serviceId={defaultServiceId} size="lg">Записаться на обучение</BookBtn>
               </div>
