@@ -50,11 +50,20 @@ export default async function InstructorBookingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Записи</h1>
-      <p className="mt-1 text-sm text-muted">
-        Подтверждённые админом клиенты. Берёте запись — жмите «Принять», после
-        занятия — «Оформить».
-      </p>
+      {/* Шапка: заголовок слева, оранжевая кнопка записи справа (пачка №6,
+          п.2). На телефоне кнопка занимает 40% строки и до неё дотягивается
+          большой палец; items-stretch тянет заголовок на высоту кнопки, чтобы
+          они читались одной строкой. Пояснительный текст убран — инструкторы
+          и так знают, что делать с записью. */}
+      <div className="flex items-stretch justify-between gap-3">
+        <h1 className="flex items-center text-3xl font-bold">Записи</h1>
+        <Link
+          href="/instructor/record"
+          className="flex w-2/5 shrink-0 items-center justify-center rounded-full bg-accent px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-accent-strong sm:w-auto sm:px-7"
+        >
+          Записать
+        </Link>
+      </div>
 
       {bookings.length === 0 && (
         <div className="mt-8 rounded-2xl border border-line bg-surface p-6 text-center text-muted">
