@@ -42,6 +42,19 @@ function CountBubble({ count }: { count: number }) {
   );
 }
 
+// Нижняя панель телефона. Инструктор смотрит в неё на пляже, под прямым
+// солнцем, — раньше активная вкладка отличалась только цветом подписи
+// (бирюзовая вместо серой) в 11 пикселей, и на выгоревшем экране разницы
+// не было видно. Теперь активная вкладка — залитая плашка с белым текстом,
+// как в меню на ПК: пятно цвета читается даже боковым зрением. Неактивные
+// подписи стали основным тёмным текстом вместо серого — по той же причине.
+const mobileBarClass =
+  "fixed inset-x-0 bottom-0 z-30 flex gap-1 border-t border-line bg-surface px-1 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] shadow-[0_-2px_12px_rgba(15,34,51,0.10)]";
+const mobileTabClass =
+  "relative flex flex-1 items-center justify-center rounded-xl px-1 py-2.5 text-[11px] font-bold leading-tight transition-colors";
+const mobileTabActive = "bg-primary text-white shadow-sm";
+const mobileTabIdle = "text-ink";
+
 export function Sidebar({
   name,
   photoUrl,
@@ -159,7 +172,7 @@ export function Sidebar({
           </>
         )}
 
-        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
+        <nav className={mobileBarClass}>
           {primaryItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
@@ -168,13 +181,11 @@ export function Sidebar({
                 href={item.href}
                 onClick={() => setOpen(false)}
                 aria-current={isActive ? "page" : undefined}
-                className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${
-                  isActive ? "text-primary" : "text-muted"
-                }`}
+                className={`${mobileTabClass} ${isActive ? mobileTabActive : mobileTabIdle}`}
               >
-                <span className="max-w-full truncate px-1">{item.short ?? item.label}</span>
+                <span className="max-w-full truncate">{item.short ?? item.label}</span>
                 {item.badge ? (
-                  <span className="absolute right-[22%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-surface">
                     {item.badge}
                   </span>
                 ) : null}
@@ -185,8 +196,8 @@ export function Sidebar({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${
-              moreActive || open ? "text-primary" : "text-muted"
+            className={`${mobileTabClass} flex-col gap-0.5 ${
+              moreActive || open ? mobileTabActive : mobileTabIdle
             }`}
           >
             <span aria-hidden className="text-base leading-none">
