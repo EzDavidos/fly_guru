@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { sellSubscriptionAction, type ActionState } from "../actions";
+import { PaymentMethodField } from "@/components/cabinet/PaymentMethodField";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -11,6 +12,8 @@ export interface SubscriptionPrefill {
   name: string;
   phone: string;
   telegram: string | null;
+  paymentMethodId?: string | null; // способ оплаты, выбранный админом в заявке
+  paymentMethodName?: string | null;
 }
 
 export function SubscriptionForm({
@@ -83,24 +86,12 @@ export function SubscriptionForm({
       </label>
 
       {paid && (
-        <div>
-          <label htmlFor="paymentMethodId" className="mb-1 block text-sm font-medium">
-            Формат оплаты *
-          </label>
-          <select
-            id="paymentMethodId"
-            name="paymentMethodId"
-            required
-            className={inputClass}
-          >
-            <option value="">Выберите…</option>
-            {paymentMethods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PaymentMethodField
+          methods={paymentMethods}
+          selectedId={prefill?.paymentMethodId}
+          selectedName={prefill?.paymentMethodName}
+          className={inputClass}
+        />
       )}
 
       <button

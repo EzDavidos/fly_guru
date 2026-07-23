@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { recordClientAction, type ActionState } from "../actions";
 import { PhoneField } from "@/components/cabinet/PhoneField";
+import { PaymentMethodField } from "@/components/cabinet/PaymentMethodField";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -18,6 +19,8 @@ export interface RecordPrefill {
   // и повторному клиенту по той же ссылке её уже не будет.
   refDiscount?: boolean;
   telegram?: string | null;
+  paymentMethodId?: string | null; // способ оплаты, выбранный админом в заявке
+  paymentMethodName?: string | null;
 }
 
 interface RecordFormProps {
@@ -123,29 +126,14 @@ export function RecordForm({
       </div>
 
       {/* Формат оплаты (пак A, пункт 6) — обязателен: занятие уже проведено и
-          оплачено, так что «чем платили» известно всегда. Пустого варианта в
-          списке нет намеренно, иначе он стал бы значением по умолчанию. */}
-      <div>
-        <label htmlFor="paymentMethodId" className="mb-1 block text-sm font-medium">
-          Формат оплаты *
-        </label>
-        <select
-          id="paymentMethodId"
-          name="paymentMethodId"
-          required
-          defaultValue=""
-          className={inputClass}
-        >
-          <option value="" disabled>
-            Выберите…
-          </option>
-          {paymentMethods.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          оплачено, так что «чем платили» известно всегда. Если запись открыли из
+          заявки, способ приезжает уже выбранным — его указал админ. */}
+      <PaymentMethodField
+        methods={paymentMethods}
+        selectedId={prefill?.paymentMethodId}
+        selectedName={prefill?.paymentMethodName}
+        className={inputClass}
+      />
 
       {/* Инструктор записывает только текущим днём — дату не выбирают, просто
           показываем её. Записи задним числом делает админ. */}

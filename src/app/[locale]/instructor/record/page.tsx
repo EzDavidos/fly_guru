@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
 import { vnToday } from "@/lib/dates";
-import { getActiveDict } from "@/lib/dictionaries";
+import { getActiveDict, embeddedName } from "@/lib/dictionaries";
 import { CopyLink } from "@/app/[locale]/admin/CopyLink";
 import { RecordForm, type RecordPrefill } from "./RecordForm";
 import { createMyRefCodeAction } from "../actions";
@@ -49,7 +49,9 @@ export default async function RecordPage({
   if (bookingId) {
     const { data: booking } = await supabase
       .from("bookings")
-      .select("id, client_name, phone, service_id, ref_code, telegram_username")
+      .select(
+        "id, client_name, phone, service_id, ref_code, telegram_username, payment_method_id, payment:payment_methods(name)",
+      )
       .eq("id", bookingId)
       .maybeSingle();
     if (booking) {
@@ -60,6 +62,10 @@ export default async function RecordPage({
         serviceId: booking.service_id ?? undefined,
         refCode: booking.ref_code,
         telegram: booking.telegram_username,
+        // Способ оплаты админ уже выбрал в карточке заявки — не спрашиваем
+        // второй раз, просто подставляем (инструктор может поменять).
+        paymentMethodId: booking.payment_method_id,
+        paymentMethodName: embeddedName(booking.payment),
       };
       // Скидку даёт ТОЛЬКО агентский код, инструкторский — нет. Проверяем,
       // чей это код, чтобы форма не обещала скидку там, где её не будет

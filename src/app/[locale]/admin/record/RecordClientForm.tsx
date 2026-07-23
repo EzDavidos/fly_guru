@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { createSessionAction } from "../actions";
 import { PhoneField } from "@/components/cabinet/PhoneField";
+import { PaymentMethodField } from "@/components/cabinet/PaymentMethodField";
 import { vnd } from "@/lib/stats";
 
 // Админская «Запись клиента». Отдельная форма (а не форма сессий), потому что
@@ -28,6 +29,8 @@ export interface RecordPrefill {
   refDiscount?: boolean;
   telegram?: string | null;
   date?: string; // дата из заявки — на неё и ляжет занятие
+  paymentMethodId?: string | null; // способ оплаты из карточки заявки
+  paymentMethodName?: string | null;
 }
 
 // Единая высота h-10 у всех полей. Дата — компактная (задаёт ширину сама, как
@@ -138,25 +141,15 @@ export function RecordClientForm({
       />
 
       {/* Формат оплаты (пак A, пункт 6) — обязателен, как и в форме сессий:
-          обе формы постят в один createSessionAction. */}
-      <label className="block text-xs text-muted">
-        Формат оплаты *
-        <select
-          name="paymentMethodId"
-          required
-          defaultValue=""
-          className={`mt-1 ${inputClass}`}
-        >
-          <option value="" disabled>
-            Выберите…
-          </option>
-          {paymentMethods.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
+          обе формы постят в один createSessionAction. Из заявки приезжает уже
+          выбранным — он проставлен в её карточке. */}
+      <PaymentMethodField
+        methods={paymentMethods}
+        selectedId={prefill?.paymentMethodId}
+        selectedName={prefill?.paymentMethodName}
+        className={`mt-1 ${inputClass}`}
+        variant="compact"
+      />
 
       <label className="block text-xs text-muted">
         Город

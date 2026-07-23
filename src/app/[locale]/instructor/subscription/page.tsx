@@ -1,8 +1,8 @@
 import { formatVnd } from "@/content/services";
 import { getSiteServices, pickService } from "@/lib/services";
 import { createClient } from "@/lib/supabase/server";
-import { getActiveDict } from "@/lib/dictionaries";
-import { SubscriptionForm } from "./SubscriptionForm";
+import { getActiveDict, embeddedName } from "@/lib/dictionaries";
+import { SubscriptionForm, type SubscriptionPrefill } from "./SubscriptionForm";
 
 // Продажа абонемента: 300 минут / 6 млн ₫, минуты живут 3 месяца.
 // Создаёт subscription (sold_by = инструктор). Членом клуба клиент при этом
@@ -20,12 +20,14 @@ export default async function SubscriptionPage({
   // Пришли из заявки на абонемент («Продать абонемент» в списке записей):
   // тянем контакты клиента, чтобы форма открылась заполненной, а продажа
   // закрыла заявку (пачка №5, п.11).
-  let prefill: { bookingId: string; name: string; phone: string; telegram: string | null } | undefined;
+  let prefill: SubscriptionPrefill | undefined;
   if (bookingId) {
     const supabase = await createClient();
     const { data: b } = await supabase
       .from("bookings")
-      .select("id, status, client_name, phone, telegram_username")
+      .select(
+        "id, status, client_name, phone, telegram_username, payment_method_id, payment:payment_methods(name)",
+      )
       .eq("id", bookingId)
       .maybeSingle();
     if (b && !["done", "cancelled", "archived"].includes(b.status)) {
@@ -34,6 +36,9 @@ export default async function SubscriptionPage({
         name: b.client_name,
         phone: b.phone,
         telegram: b.telegram_username,
+        // Способ оплаты уже выбран админом в заявке — подставляем.
+        paymentMethodId: b.payment_method_id,
+        paymentMethodName: embeddedName(b.payment),
       };
     }
   }

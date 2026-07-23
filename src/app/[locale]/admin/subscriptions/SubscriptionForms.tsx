@@ -6,6 +6,7 @@ import {
   adjustMinutesAction,
   writeOffMinutesAction,
 } from "../actions";
+import { PaymentMethodField } from "@/components/cabinet/PaymentMethodField";
 
 // Клиентские кусочки страницы абонементов: две формы с ошибками без
 // перезагрузки (useActionState). Кнопка с confirm() — в ../ConfirmSubmit.
@@ -31,6 +32,8 @@ export interface SubscriptionPrefill {
   phone: string;
   telegram: string | null;
   clientId: string | null;
+  paymentMethodId?: string | null; // способ оплаты из карточки заявки
+  paymentMethodName?: string | null;
 }
 
 export function SellSubscriptionForm({
@@ -151,17 +154,14 @@ export function SellSubscriptionForm({
       </div>
 
       {paid && (
-        <label className="block text-xs text-muted">
-          Формат оплаты
-          <select name="paymentMethodId" required className={`mt-1 ${inputClass}`}>
-            <option value="">Выберите…</option>
-            {paymentMethods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        // Из заявки способ приезжает уже выбранным — он проставлен в её карточке.
+        <PaymentMethodField
+          methods={paymentMethods}
+          selectedId={prefill?.paymentMethodId}
+          selectedName={prefill?.paymentMethodName}
+          className={`mt-1 ${inputClass}`}
+          variant="compact"
+        />
       )}
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

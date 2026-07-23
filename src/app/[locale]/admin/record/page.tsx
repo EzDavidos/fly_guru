@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth";
 import { vnToday } from "@/lib/dates";
-import { getActiveDict } from "@/lib/dictionaries";
+import { getActiveDict, embeddedName } from "@/lib/dictionaries";
 import { RecordClientForm, type RecordPrefill } from "./RecordClientForm";
 import { firstBasicTrainingByPhone } from "@/lib/agentReward";
 
@@ -45,7 +45,9 @@ export default async function AdminRecordPage({
   if (bookingId) {
     const { data: booking } = await supabase
       .from("bookings")
-      .select("id, client_name, phone, service_id, ref_code, preferred_date, telegram_username")
+      .select(
+        "id, client_name, phone, service_id, ref_code, preferred_date, telegram_username, payment_method_id, payment:payment_methods(name)",
+      )
       .eq("id", bookingId)
       .maybeSingle();
     if (booking) {
@@ -61,6 +63,10 @@ export default async function AdminRecordPage({
         refCode: booking.ref_code,
         telegram: booking.telegram_username,
         date: day && day <= today ? day : today,
+        // Способ оплаты, проставленный в карточке заявки: спрашивать его тут
+        // заново — то же действие второй раз.
+        paymentMethodId: booking.payment_method_id,
+        paymentMethodName: embeddedName(booking.payment),
       };
       // Чей это код и положена ли гостю скидка — та же проверка, что делает
       // расчёт чека: скидку даёт только активный агент и только за первое

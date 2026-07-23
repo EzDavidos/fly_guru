@@ -9,11 +9,12 @@ import {
   togglePaidAction,
 } from "../actions";
 import { ConfirmSubmit } from "../ConfirmSubmit";
-import { getActiveDict } from "@/lib/dictionaries";
+import { getActiveDict, embeddedName } from "@/lib/dictionaries";
 import {
   SellSubscriptionForm,
   AdjustMinutesForm,
   WriteOffMinutesForm,
+  type SubscriptionPrefill,
 } from "./SubscriptionForms";
 
 export const metadata: Metadata = { title: "Админка · Абонементы" };
@@ -292,13 +293,13 @@ export default async function AdminSubscriptionsPage({
   // Пришли из заявки на абонемент («Продать абонемент» в ленте заявок) —
   // тянем контакты клиента, чтобы форма открылась уже заполненной, а продажа
   // закрыла заявку. Так продажа с сайта не проваливается мимо минут/оплаты.
-  let bookingPrefill:
-    | { bookingId: string; name: string; phone: string; telegram: string | null; clientId: string | null }
-    | undefined;
+  let bookingPrefill: SubscriptionPrefill | undefined;
   if (bookingId) {
     const { data: b } = await supabase
       .from("bookings")
-      .select("id, status, client_name, phone, telegram_username, client_id")
+      .select(
+        "id, status, client_name, phone, telegram_username, client_id, payment_method_id, payment:payment_methods(name)",
+      )
       .eq("id", bookingId)
       .maybeSingle();
     if (b && !["done", "cancelled", "archived"].includes(b.status)) {
@@ -308,6 +309,9 @@ export default async function AdminSubscriptionsPage({
         phone: b.phone,
         telegram: b.telegram_username,
         clientId: b.client_id,
+        // Способ оплаты уже выбран в карточке заявки — подставляем.
+        paymentMethodId: b.payment_method_id,
+        paymentMethodName: embeddedName(b.payment),
       };
     }
   }
