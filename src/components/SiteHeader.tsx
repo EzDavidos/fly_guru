@@ -30,33 +30,45 @@ export function SiteHeader() {
     const supabase = createClient();
     let cancelled = false;
 
-    const refresh = () => {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (cancelled) return;
-        const role = session?.user.app_metadata?.role as string | undefined;
-        if (!role) return;
-        setCabinetHref(`/${role}`); // /admin, /instructor, /member, /agent
+    const refresh = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled || !session) return;
 
-        if (role === "instructor" || role === "admin") {
-          // RLS (bookings_select_staff) пропустит только персонал.
-          // Инструктору важны непринятые записи, админу — свежие заявки с сайта.
-          let q = supabase
-            .from("bookings")
-            .select("id", { count: "exact", head: true });
-          q =
-            role === "admin"
-              ? q.eq("status", "new")
-              : q.eq("status", "confirmed").is("accepted_by", null);
-          q.then(({ count }) => {
-            if (!cancelled) setActiveCount(count ?? 0);
-          });
-        }
-      });
+      // Роль спрашиваем у базы, а НЕ у JWT (app_metadata.role). Токен в браузере
+      // отстаёт: у повышенного до admin инструктора он до ближайшего обновления
+      // всё ещё говорит «instructor» — и кнопка вела в чужой кабинет, куда
+      // middleware спокойно пускал (роль в токене совпала с разделом). Запрос
+      // уходит только у залогиненных; RLS users_select_own отдаёт свою строку.
+      const { data: row } = await supabase
+        .from("users")
+        .select("role")
+        .eq("auth_id", session.user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const role = row?.role as string | undefined;
+      if (!role) return;
+      setCabinetHref(`/${role}`); // /admin, /instructor, /member, /agent
+
+      if (role === "instructor" || role === "admin") {
+        // RLS (bookings_select_staff) пропустит только персонал.
+        // Инструктору важны непринятые записи, админу — свежие заявки с сайта.
+        let q = supabase
+          .from("bookings")
+          .select("id", { count: "exact", head: true });
+        q =
+          role === "admin"
+            ? q.eq("status", "new")
+            : q.eq("status", "confirmed").is("accepted_by", null);
+        const { count } = await q;
+        if (!cancelled) setActiveCount(count ?? 0);
+      }
     };
 
-    refresh();
+    void refresh();
     const onVisible = () => {
-      if (document.visibilityState === "visible") refresh();
+      if (document.visibilityState === "visible") void refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
