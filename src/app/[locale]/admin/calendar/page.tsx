@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { vnToday, vnTimeLabel } from "@/lib/dates";
 import { getMonthCalendar, loadShiftPhotos, type ShiftPhoto } from "@/lib/shifts";
@@ -11,12 +10,15 @@ import {
 } from "@/lib/shiftRules";
 import { MonthGrid } from "@/components/cabinet/MonthGrid";
 import { CalMonthNav, resolveCalYm } from "@/components/cabinet/CalMonthNav";
+import { DayModal } from "@/components/cabinet/DayModal";
+import { ShiftPhotos } from "@/components/cabinet/ShiftPhotos";
 import { assignShiftAction, removeShiftAction } from "../actions";
 
 export const metadata: Metadata = { title: "Админка · Календарь" };
 
 // Календарь (пак H1): админ ставит инструкторам смены (выходы) на дни и видит
-// записи клиентов по дням. Клик по дню открывает панель дня (?d=…) — чистый SSR.
+// записи клиентов по дням. Клик по дню открывает карточку дня ПОВЕРХ сетки
+// (?d=…, пачка №5 п.9) — чистый SSR, формы внутри остаются server actions.
 // В паке H2 число смен за месяц пойдёт в ЗП (200 000 ₫ × выходов).
 
 function fmtFullDay(d: string): string {
@@ -100,12 +102,10 @@ export default async function AdminCalendarPage({
         />
       </div>
 
-      {/* Панель дня */}
+      {/* Карточка дня — поверх календаря */}
       {selected && (
-        <section className="mt-4 rounded-2xl border border-line bg-surface p-4">
-          <h2 className="font-bold capitalize">{fmtFullDay(selected)}</h2>
-
-          <h3 className="mt-3 text-sm font-bold text-muted">Смены</h3>
+        <DayModal title={fmtFullDay(selected)} closeHref={`/admin/calendar?m=${ym}`}>
+          <h3 className="text-sm font-bold text-muted">Смены</h3>
           <div className="mt-2 space-y-2">
             {cal.staff.map((u) => {
               const shift = shiftByInstr.get(u.id);
@@ -118,9 +118,11 @@ export default async function AdminCalendarPage({
               return (
                 <div
                   key={u.id}
-                  className="rounded-xl border border-line/70 px-3 py-2"
+                  className="rounded-xl border border-line/70 px-3 py-2.5"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  {/* На телефоне имя и действие в столбик: кнопка «Смена» с
+                      полем заметки в одну строку не помещалась. */}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <span className="min-w-0 text-sm font-semibold">
                       {shift && <span className="text-accent-strong">🏄 </span>}
                       {u.name}
@@ -139,7 +141,7 @@ export default async function AdminCalendarPage({
                           type="submit"
                           className="text-xs font-semibold text-muted transition-colors hover:text-red-500"
                         >
-                          Убрать
+                          Убрать смену
                         </button>
                       </form>
                     ) : (
@@ -150,11 +152,11 @@ export default async function AdminCalendarPage({
                           type="text"
                           name="note"
                           placeholder="заметка"
-                          className="w-24 rounded-lg border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-primary"
+                          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs outline-none focus:border-primary sm:w-28 sm:flex-none"
                         />
                         <button
                           type="submit"
-                          className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-primary/90"
+                          className="shrink-0 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary/90"
                         >
                           Смена
                         </button>
@@ -162,73 +164,47 @@ export default async function AdminCalendarPage({
                     )}
                   </div>
 
-                  {/* Факт выхода: во сколько открыл/закрыл и статус */}
+                  {/* Факт выхода: во сколько открыл и закрыл смену */}
                   {status && (
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       {shift!.openedAt ? (
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusClass(
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
                             status.open === "late",
                           )}`}
                         >
-                          открыл {vnTimeLabel(shift!.openedAt)} · {OPEN_LABEL[status.open]}
+                          Открыл {vnTimeLabel(shift!.openedAt)} · {OPEN_LABEL[status.open]}
                         </span>
                       ) : (
-                        <span className="rounded-full bg-line/40 px-2 py-0.5 text-[11px] font-semibold text-muted">
-                          не открыл
+                        <span className="rounded-full bg-line/40 px-2.5 py-1 text-xs font-semibold text-muted">
+                          Не открыл
                         </span>
                       )}
                       {shift!.closedAt ? (
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusClass(
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
                             status.close === "early",
                           )}`}
                         >
-                          закрыл {vnTimeLabel(shift!.closedAt)} · {CLOSE_LABEL[status.close]}
+                          Закрыл {vnTimeLabel(shift!.closedAt)} · {CLOSE_LABEL[status.close]}
                         </span>
                       ) : shift!.openedAt ? (
-                        <span className="rounded-full bg-line/40 px-2 py-0.5 text-[11px] font-semibold text-muted">
-                          не закрыл
+                        <span className="rounded-full bg-line/40 px-2.5 py-1 text-xs font-semibold text-muted">
+                          Не закрыл
                         </span>
                       ) : null}
                     </div>
                   )}
 
                   {(shift?.openComment || shift?.closeComment) && (
-                    <p className="mt-1 text-xs text-muted">
+                    <p className="mt-1.5 text-xs text-muted">
                       {shift.openComment && <>Открытие: {shift.openComment}. </>}
                       {shift.closeComment && <>Закрытие: {shift.closeComment}.</>}
                     </p>
                   )}
 
-                  {/* Фото смены: открытие и закрытие */}
-                  {photos.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {photos.map((p) => (
-                        <a
-                          key={p.id}
-                          href={p.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="relative block"
-                          title={`${p.phase === "open" ? "Открытие" : "Закрытие"} · ${
-                            p.equipmentName ?? p.kind
-                          }`}
-                        >
-                          <Image
-                            src={p.url}
-                            alt={p.equipmentName ?? p.kind}
-                            width={64}
-                            height={64}
-                            className="h-16 w-16 rounded-lg object-cover"
-                          />
-                          <span className="absolute left-0 top-0 rounded-br-lg rounded-tl-lg bg-black/55 px-1 text-[9px] font-bold text-white">
-                            {p.phase === "open" ? "утро" : "вечер"}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
+                  {/* Фото смены — каждое с подписью, к чему относится */}
+                  <ShiftPhotos photos={photos} />
                 </div>
               );
             })}
@@ -237,18 +213,23 @@ export default async function AdminCalendarPage({
             )}
           </div>
 
-          <h3 className="mt-4 text-sm font-bold text-muted">Записи клиентов</h3>
+          <h3 className="mt-5 text-sm font-bold text-muted">Записи клиентов</h3>
           {dayData && dayData.bookings.length > 0 ? (
             <div className="mt-2 space-y-2">
               {dayData.bookings.map((b) => (
-                <div key={b.id} className="text-sm">
-                  <span className="font-semibold">{b.time ?? "—"}</span> ·{" "}
-                  {b.clientName}
-                  {b.serviceName && (
-                    <span className="text-muted"> · {b.serviceName}</span>
-                  )}
-                  {b.acceptedName && (
-                    <span className="text-muted"> · принял {b.acceptedName}</span>
+                <div
+                  key={b.id}
+                  className="rounded-xl border border-line/70 px-3 py-2 text-sm"
+                >
+                  <p className="font-semibold">
+                    {b.time ?? "—"} · {b.clientName}
+                  </p>
+                  {(b.serviceName || b.acceptedName) && (
+                    <p className="text-xs text-muted">
+                      {[b.serviceName, b.acceptedName && `принял ${b.acceptedName}`]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
                   )}
                 </div>
               ))}
@@ -256,7 +237,7 @@ export default async function AdminCalendarPage({
           ) : (
             <p className="mt-2 text-sm text-muted">Записей на этот день нет.</p>
           )}
-        </section>
+        </DayModal>
       )}
     </div>
   );

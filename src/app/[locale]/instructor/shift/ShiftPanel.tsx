@@ -15,6 +15,7 @@ import {
   OPEN_LABEL,
   CLOSE_LABEL,
   statusClass,
+  PHOTO_KIND_LABEL as KIND_LABEL,
 } from "@/lib/shiftRules";
 import { vnTimeLabel } from "@/lib/dates";
 
@@ -22,13 +23,6 @@ import { vnTimeLabel } from "@/lib/dates";
 // (каждая — свой useActionState ради ошибки под кнопкой), удаление кадра,
 // открытие и закрытие. Данные приходят с сервера; после каждого действия
 // revalidatePath перерисовывает их, и счётчики фото обновляются сами.
-
-const KIND_LABEL: Record<PhotoKind, string> = {
-  board: "Доска",
-  wing: "Крыло",
-  comms: "Связь",
-  extra: "Дефект",
-};
 
 // Один загрузчик снимка. key завязан на число уже сделанных кадров этого слота:
 // после успешной загрузки счётчик растёт → форма перемонтируется → поля

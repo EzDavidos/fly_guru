@@ -1,4 +1,5 @@
 import { vnClock } from "@/lib/dates";
+import type { PhotoKind, PhotoPhase } from "@/lib/shifts";
 
 // Правила смены (пачка правок №4, пак C, пункт 5).
 //
@@ -58,6 +59,21 @@ export const CLOSE_LABEL: Record<CloseStatus, string> = {
   ok: "всё чётко",
   early: "залёт",
   notClosed: "не закрыта",
+};
+
+// Подписи к снимкам смены. Раньше жили только внутри экрана «Смена», из-за
+// чего в календаре кадры шли без пояснения — было непонятно, что на фото
+// (пачка №5, п.9: «надо подписывать каждое фото»).
+export const PHOTO_KIND_LABEL: Record<PhotoKind, string> = {
+  board: "Доска",
+  wing: "Крыло",
+  comms: "Связь",
+  extra: "Дефект",
+};
+
+export const PHOTO_PHASE_LABEL: Record<PhotoPhase, string> = {
+  open: "Открытие",
+  close: "Закрытие",
 };
 
 // Цвет метки: тревожное — красным, нормальное — приглушённым.
