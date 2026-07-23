@@ -3,22 +3,14 @@ import { Container, Section, SectionHeading, Card, Button, Badge } from "@/compo
 import { IconCheck, IconWaves, IconPin, IconClub } from "@/components/icons";
 import { Media, VideoLoop } from "@/components/Media";
 import { formatVnd, formatDuration } from "@/content/services";
-import { BookBtn } from "@/components/BookBtn";
-import { getActiveServices, getSiteServices, pickService } from "@/lib/services";
+import { getSiteServices, pickService } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Клуб" };
 export const dynamic = "force-static"; // статичная страница, форсим SSG
 
 export default async function ClubPage() {
-  // Все активные услуги из базы — на клубе человек может выбрать любую.
-  // Цены карточек — тоже из базы (правятся в админке, /admin/services).
-  const [services, site] = await Promise.all([
-    getActiveServices(),
-    getSiteServices(),
-  ]);
-  const defaultServiceId = services.find(
-    (s) => s.name === pickService(site, "subscription").name,
-  )?.id;
+  // Цены карточек — из базы (правятся в админке, /admin/services).
+  const site = await getSiteServices();
 
   const sub = pickService(site, "subscription");
   const rental = pickService(site, "rental");
@@ -50,7 +42,7 @@ export default async function ClubPage() {
             Клуб FlyGuru
           </p>
           <h1 className="max-w-2xl text-3xl font-bold leading-tight sm:text-4xl">
-            Абонемент, членство и выезды для своих
+            Абонемент и выезды для своих
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-muted">
             Клуб — это про регулярное катание по выгодной цене и доступ к экскурсиям
@@ -101,8 +93,8 @@ export default async function ClubPage() {
               </div>
               <ul className="mt-4 space-y-2 text-sm text-muted">
                 <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Списывайте минуты, когда удобно</li>
-                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Активирует членство в клубе</li>
-                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Открывает доступ к выездам</li>
+                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Цена минуты вдвое ниже разового проката</li>
+                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Выезды — по одобрению инструктора</li>
               </ul>
               <div className="mt-6">
                 <Button href="/contacts" className="w-full">Купить абонемент</Button>
@@ -116,57 +108,47 @@ export default async function ClubPage() {
         </Container>
       </Section>
 
-      {/* Членство */}
+      {/* Что даёт клуб. Раньше здесь был блок «Членство» с условиями, которых в
+          жизни ещё нет (активация абонементом, привилегии по остатку минут) —
+          убран, чтобы не обещать несуществующее. Останутся только пункты,
+          которые школа реально выполняет сегодня. */}
       <Section>
         <Container>
-          <div className="grid gap-8 md:grid-cols-2">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <IconClub className="h-6 w-6" />
-                </div>
-                <SectionHeading eyebrow="Членство" title="Как это работает" />
-              </div>
-              {/* TODO: условия членства уточняются у руководителя (вариант Дениса:
-                  членство после базового обучения, привилегии активны постоянно).
-                  До решения оставляем осторожную формулировку. */}
-              <ul className="mt-6 space-y-3 text-muted">
-                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Членство активируется покупкой первого абонемента.</li>
-                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Клубные привилегии (выезды, «приведи друга», скидки) действуют, пока на абонементе есть минуты.</li>
-                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Закончились минуты — просто продлите абонемент, и привилегии снова активны.</li>
-              </ul>
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <IconClub className="h-6 w-6" />
             </div>
-            <Card className="bg-surface-2">
-              <h3 className="font-bold">Что даёт клуб</h3>
-              <ul className="mt-4 space-y-2 text-sm text-muted">
-                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Экскурсии и сафари</li>
-                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Минуты за приглашённых друзей</li>
-                <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Выгодная цена за минуту катания</li>
-              </ul>
-              <div className="mt-5 grid grid-cols-3 gap-3">
-                <Media
-                  src="/media/photo/club-kokos.webp"
-                  alt="Кокос на доске электрофойла посреди моря"
-                  ratio="1/1"
-                  rounded="rounded-xl"
-                  sizes="120px"
-                />
-                <Media
-                  src="/media/photo/club-napitok.webp"
-                  alt="Гость клуба с напитком на электрофойле"
-                  ratio="1/1"
-                  rounded="rounded-xl"
-                  sizes="120px"
-                />
-                <Media
-                  src="/media/photo/safari-ostrov.webp"
-                  alt="Электрофойлы на берегу острова во время сафари"
-                  ratio="1/1"
-                  rounded="rounded-xl"
-                  sizes="120px"
-                />
-              </div>
-            </Card>
+            <SectionHeading eyebrow="Клуб" title="Что даёт клуб" />
+          </div>
+          <div className="mt-8 grid gap-8 md:grid-cols-2">
+            <ul className="space-y-3 text-muted">
+              <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Экскурсии и сафари вместе с командой</li>
+              <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Выгодная цена за минуту катания по абонементу</li>
+              <li className="flex gap-2"><IconCheck className="h-5 w-5 shrink-0 text-primary" /> Катание с теми, кто уже уверенно стоит на крыле</li>
+            </ul>
+            <div className="grid grid-cols-3 gap-3">
+              <Media
+                src="/media/photo/club-kokos.webp"
+                alt="Кокос на доске электрофойла посреди моря"
+                ratio="1/1"
+                rounded="rounded-xl"
+                sizes="120px"
+              />
+              <Media
+                src="/media/photo/club-napitok.webp"
+                alt="Гость клуба с напитком на электрофойле"
+                ratio="1/1"
+                rounded="rounded-xl"
+                sizes="120px"
+              />
+              <Media
+                src="/media/photo/safari-ostrov.webp"
+                alt="Электрофойлы на берегу острова во время сафари"
+                ratio="1/1"
+                rounded="rounded-xl"
+                sizes="120px"
+              />
+            </div>
           </div>
         </Container>
       </Section>
@@ -211,26 +193,10 @@ export default async function ClubPage() {
         </Container>
       </Section>
 
-      {/* Приведи друга */}
-      <Section>
-        <Container>
-          <div className="rounded-3xl border border-line bg-surface p-8 sm:p-10">
-            <SectionHeading eyebrow="Приведи друга" title="Дари скидку — получай минуты" />
-            {/* TODO: куда начислять минуты, если у реферера нет активного абонемента —
-                уточняется у руководителя (этап 5). */}
-            <p className="mt-4 max-w-2xl text-muted">
-              У каждого члена клуба есть личная ссылка. Друг получает скидку 200 000 ₫ на
-              базовое обучение, а вам начисляются минуты: +10, когда друг прошёл обучение,
-              и +30, если он купил абонемент.
-            </p>
-            <div className="mt-6">
-              <BookBtn serviceId={defaultServiceId} variant="secondary">
-                Стать членом клуба
-              </BookBtn>
-            </div>
-          </div>
-        </Container>
-      </Section>
+      {/* Блок «Приведи друга» убран: личных ссылок у клиентов в системе нет,
+          минуты за друзей нигде не начисляются, а скидка −10% на первое базовое
+          обучение работает только по ссылке агента. Вернём, когда механика
+          клиентских ссылок появится в CRM. */}
     </>
   );
 }
