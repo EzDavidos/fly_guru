@@ -13,13 +13,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // заявка «за сегодня» под чистку не попадает — админ досматривает день целиком.
 //
 // /api без middleware — защищаемся секретом (Vercel шлёт Authorization: Bearer
-// <CRON_SECRET>, если переменная задана) и ходим service_role клиентом.
+// <CRON_SECRET>) и ходим service_role клиентом. Без секрета роут не работает
+// вообще: иначе любой желающий отправил бы все заявки в архив одной ссылкой.
 
 const CLOSED = ["done", "cancelled"];
 
 function authorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // секрет ещё не задан — не блокируем
+  if (!secret) {
+    console.error("[cron archive-bookings] CRON_SECRET не задан — запрос отклонён");
+    return false;
+  }
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 

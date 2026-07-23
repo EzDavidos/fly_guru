@@ -7,13 +7,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // сначала файлы из бакета, потом строки.
 //
 // /api без middleware — защищаемся секретом (Vercel шлёт Authorization: Bearer
-// <CRON_SECRET>, если переменная задана) и ходим service_role клиентом.
+// <CRON_SECRET>) и ходим service_role клиентом. Без секрета роут не работает
+// вообще: иначе чужой человек мог бы снести фото смен одной ссылкой.
 
 const MAX_AGE_DAYS = 3;
 
 function authorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // секрет ещё не задан — не блокируем
+  if (!secret) {
+    console.error("[cron cleanup] CRON_SECRET не задан — запрос отклонён");
+    return false;
+  }
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 

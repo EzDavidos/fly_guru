@@ -10,11 +10,15 @@ import { sendShiftReminder } from "@/lib/telegram";
 //
 // /api не проходит через middleware, сессии тут нет — работаем service_role
 // клиентом и защищаемся секретом (Vercel сам шлёт Authorization: Bearer
-// <CRON_SECRET>, если переменная задана).
+// <CRON_SECRET>). Без секрета роут не работает вообще: иначе чужой человек мог
+// бы спамить группу инструкторов напоминалками.
 
 function authorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // секрет ещё не задан — не блокируем (dev/до настройки)
+  if (!secret) {
+    console.error("[cron shift-reminder] CRON_SECRET не задан — запрос отклонён");
+    return false;
+  }
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
