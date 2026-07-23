@@ -57,6 +57,7 @@ function SubscriptionCard({
   today,
   staff,
   paymentName,
+  paymentMethods,
 }: {
   s: SubRow;
   left: number;
@@ -64,9 +65,11 @@ function SubscriptionCard({
   today: string;
   // Кому записать прокат — тот же список, что в форме продажи.
   staff: { id: string; name: string }[];
-  // Чем заплатили (0025). undefined — миграция ещё не накатана или продажа
-  // прошла до неё: тогда блок просто не показываем.
+  // Чем заплатили (0025). undefined — способ не записан: так бывает у продаж
+  // до миграции и у тех, кому оплату отметили кнопкой задним числом.
   paymentName?: string;
+  // Справочник для отметки оплаты задним числом.
+  paymentMethods: { id: string; name: string }[];
 }) {
   // Отменённый — продажа не состоялась (п.13). Проверяем первым: у него могли
   // и минуты кончиться, и срок выйти, но человеку важно одно — он отменён.
@@ -124,12 +127,22 @@ function SubscriptionCard({
 
         {/* Чем заплатили — той же плашкой, что в ленте заявок, чтобы способ
             оплаты выглядел одинаково везде. */}
-        {paymentName && !cancelled && (
-          <p className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-bold text-emerald-600">
-            <span aria-hidden>💵</span>
-            Оплата: {paymentName}
-          </p>
-        )}
+        {!cancelled &&
+          (paymentName ? (
+            <p className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-bold text-emerald-600">
+              <span aria-hidden>💵</span>
+              Оплата: {paymentName}
+            </p>
+          ) : (
+            // Деньги получены, а чем — не записано. Показываем жёлтым, как в
+            // заявках и сессиях: пустое место читалось бы как «поля нет».
+            s.paid_at && (
+              <p className="mt-2 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-bold text-amber-600">
+                <span aria-hidden>💵</span>
+                Оплата: не указана
+              </p>
+            )
+          ))}
 
         {/* Отметка оплаты. У отменённого её нет: пока он в отменённых, деньги
             не должны попадать ни в выручку, ни в комиссию продавца. */}
@@ -147,7 +160,7 @@ function SubscriptionCard({
               </ConfirmSubmit>
             </>
           ) : (
-            <div className="flex items-end gap-2">
+            <div className="flex flex-wrap items-end gap-2">
               <input type="hidden" name="set" value="1" />
               <label className="w-40 text-xs text-muted">
                 Дата оплаты
@@ -158,6 +171,24 @@ function SubscriptionCard({
                   max={today}
                   className={`mt-1 ${inputClass}`}
                 />
+              </label>
+              {/* Спрашиваем и чем заплатили: раньше кнопка ставила только дату,
+                  и абонемент, оплаченный задним числом, навсегда оставался без
+                  способа оплаты — дозаполнить его было негде. */}
+              <label className="w-40 text-xs text-muted">
+                Формат оплаты
+                <select
+                  name="paymentMethodId"
+                  defaultValue={paymentMethods[0]?.id ?? ""}
+                  className={`mt-1 ${inputClass}`}
+                >
+                  <option value="">— не указан —</option>
+                  {paymentMethods.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <button
                 type="submit"
@@ -458,6 +489,7 @@ export default async function AdminSubscriptionsPage({
             today={today}
             staff={staffRes.data ?? []}
             paymentName={paymentBySub.get(s.id)}
+            paymentMethods={paymentMethods}
           />
         ))}
       </div>

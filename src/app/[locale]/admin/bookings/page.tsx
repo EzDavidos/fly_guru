@@ -49,6 +49,14 @@ interface BookingRow {
 
 const TERMINAL = ["done", "cancelled", "archived"];
 
+// Заявка, которая закончилась занятием (а не отказом). У «выполнена» это видно
+// по статусу; в архиве статус уже общий для всех закрытых, поэтому смотрим на
+// клиента: его привязывает оформление занятия, у отменённых заявок его нет.
+// Нужно, чтобы не пугать «оплата не указана» там, где клиент просто не пришёл.
+function isClosedDeal(b: BookingRow): boolean {
+  return b.status === "done" || (b.status === "archived" && b.client_id !== null);
+}
+
 // Подпись и цвет бейджа. «Ожидает оплату» вычисляем из accepted.
 function statusBadge(b: BookingRow): { label: string; cls: string } {
   if (b.status === "confirmed" && b.accepted)
@@ -172,11 +180,24 @@ function BookingCard({
         {/* Чем платят. Отдельной заметной плашкой, а не строчкой в общем
             списке: способ оплаты ищут глазами (пачка №5, чек-лист админки).
             Проставляется сам, когда заявку доводят до занятия. */}
-        {b.payment && (
+        {b.payment ? (
           <p className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-bold text-emerald-600">
             <span aria-hidden>💵</span>
             Оплата: {b.payment.name}
           </p>
+        ) : (
+          // Заявку довели до занятия, а чем расплатились — не записано. Так
+          // бывает, когда её закрыли кнопкой «Выполнена» вручную, минуя
+          // «Записать клиента»: способ оплаты там никто не спрашивает. Раньше
+          // в этом случае не было видно НИЧЕГО, и пустота читалась как «такого
+          // поля нет». Теперь видно, что данные не внесли, — а поправить можно
+          // в списке «Формат оплаты» ниже.
+          isClosedDeal(b) && (
+            <p className="mt-2 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-bold text-amber-600">
+              <span aria-hidden>💵</span>
+              Оплата: не указана
+            </p>
+          )
         )}
 
         {/* Атрибуция: откуда пришёл клиент */}
