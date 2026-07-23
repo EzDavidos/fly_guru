@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { vnd } from "@/lib/stats";
-import { toggleAgentActiveAction } from "../actions";
+import { deleteAgentPayoutAction, toggleAgentActiveAction } from "../actions";
 import { AgentCreateForm } from "./AgentCreateForm";
+import { AgentPayoutForm } from "./AgentPayoutForm";
 import { CopyLink } from "../CopyLink";
+import { ConfirmSubmit } from "../ConfirmSubmit";
+import { getActiveDict, type DictItem } from "@/lib/dictionaries";
+import { vnToday } from "@/lib/dates";
 
 export const metadata: Metadata = { title: "Админка · Агенты" };
 
@@ -27,6 +31,7 @@ interface AgentStats {
   pendingSum: number;
   confirmedCount: number;
   confirmedSum: number;
+  paidSum: number; // сколько денег агенту уже отдали (п.7)
 }
 
 const EMPTY_STATS: AgentStats = {
@@ -37,10 +42,43 @@ const EMPTY_STATS: AgentStats = {
   pendingSum: 0,
   confirmedCount: 0,
   confirmedSum: 0,
+  paidSum: 0,
 };
 
-function AgentCard({ a, stats }: { a: AgentRow; stats: AgentStats }) {
+// Одна выплата в истории карточки.
+interface PayoutRow {
+  id: string;
+  agent_id: string;
+  amount: number;
+  paid_on: string;
+  comment: string | null;
+  method: { name: string } | null;
+}
+
+// Короткая дата: «12.07.2026». paid_on — чистый день, без времени и часовых
+// поясов, поэтому берём его как есть, а не гоняем через Date.
+function fmtDay(day: string): string {
+  const [y, m, d] = day.split("-");
+  return d && m && y ? `${d}.${m}.${y}` : day;
+}
+
+function AgentCard({
+  a,
+  stats,
+  payouts,
+  methods,
+  today,
+}: {
+  a: AgentRow;
+  stats: AgentStats;
+  payouts: PayoutRow[];
+  methods: DictItem[];
+  today: string;
+}) {
   const name = a.user?.name ?? "агент";
+  // К выплате: заработанное (подтверждённые награды) минус уже отданное.
+  // Может уйти в минус — значит выплатили авансом; так и показываем.
+  const due = stats.confirmedSum - stats.paidSum;
   return (
     <details
       className={`group rounded-2xl border border-line bg-surface ${a.active ? "" : "opacity-60"}`}
@@ -56,6 +94,13 @@ function AgentCard({ a, stats }: { a: AgentRow; stats: AgentStats }) {
             {stats.confirmedCount} наград
           </p>
         </div>
+        {/* Долг перед агентом виден, не раскрывая карточку — по нему админ и
+            решает, кому сегодня отдавать деньги (п.7). */}
+        {due > 0 && (
+          <span className="whitespace-nowrap rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
+            к выплате {vnd(due)}
+          </span>
+        )}
         {!a.active && (
           <span className="rounded-full bg-line/60 px-2.5 py-1 text-[11px] font-semibold text-muted">
             Выключен
@@ -115,6 +160,59 @@ function AgentCard({ a, stats }: { a: AgentRow; stats: AgentStats }) {
           <p>Комиссия за клиента: {vnd(a.commission_fixed)}</p>
         </div>
 
+        {/* Деньги: сколько заработал, сколько отдали, сколько должны (п.7).
+            Выплата — только отметка «деньги переданы»: в расходы школы
+            комиссия уже попала при начислении, второй раз не считаем. */}
+        <div className="rounded-2xl border border-line/70 p-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <p className="text-muted">
+              Начислено: <span className="font-bold text-ink">{vnd(stats.confirmedSum)}</span>
+            </p>
+            <p className="text-muted">
+              Выплачено: <span className="font-bold text-ink">{vnd(stats.paidSum)}</span>
+            </p>
+            <p className="text-muted">
+              К выплате:{" "}
+              <span className={`font-bold ${due > 0 ? "text-amber-600" : "text-ink"}`}>
+                {vnd(due)}
+              </span>
+            </p>
+          </div>
+
+          <AgentPayoutForm
+            agentId={a.id}
+            suggested={due > 0 ? due : 0}
+            methods={methods}
+            today={today}
+          />
+
+          {payouts.length > 0 && (
+            <div className="mt-3 border-t border-line/70 pt-2">
+              <p className="text-xs font-semibold text-muted">История выплат</p>
+              <ul className="mt-1 space-y-1 text-xs text-muted">
+                {payouts.map((p) => (
+                  <li key={p.id} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1">
+                      {fmtDay(p.paid_on)} · {vnd(p.amount)}
+                      {p.method?.name ? ` · ${p.method.name}` : ""}
+                      {p.comment ? ` — ${p.comment}` : ""}
+                    </span>
+                    <form action={deleteAgentPayoutAction}>
+                      <input type="hidden" name="id" value={p.id} />
+                      <ConfirmSubmit
+                        message="Удалить эту выплату? Сумма «к выплате» пересчитается."
+                        className="text-muted transition-colors hover:text-red-500"
+                      >
+                        ✕
+                      </ConfirmSubmit>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
         <form action={toggleAgentActiveAction}>
           <input type="hidden" name="id" value={a.id} />
           <input type="hidden" name="active" value={a.active ? "1" : "0"} />
@@ -132,6 +230,9 @@ function AgentCard({ a, stats }: { a: AgentRow; stats: AgentStats }) {
 
 export default async function AdminAgentsPage() {
   const supabase = await createClient();
+  const today = vnToday();
+  // Способы выплаты берём из общего справочника форматов оплаты.
+  const methods = await getActiveDict(supabase, "payment_methods");
 
   const { data: agentsData } = await supabase
     .from("agents")
@@ -140,7 +241,7 @@ export default async function AdminAgentsPage() {
 
   // Метрики тремя запросами на всех агентов сразу (не по одному на карточку),
   // агрегация в JS — на масштабе школы это дешевле и проще group by.
-  const [visitsRes, clientsRes, rewardsRes, bookingsRes] = await Promise.all([
+  const [visitsRes, clientsRes, rewardsRes, bookingsRes, payoutsRes] = await Promise.all([
     supabase.from("ref_visits").select("code").limit(100000),
     supabase
       .from("clients")
@@ -158,7 +259,18 @@ export default async function AdminAgentsPage() {
       .select("ref_code, status")
       .not("ref_code", "is", null)
       .in("status", ["new", "confirmed"]),
+    // Выплаты агентам (п.7): свежие сверху, показываем последние в карточке.
+    supabase
+      .from("agent_payouts")
+      .select("id, agent_id, amount, paid_on, comment, method:payment_methods!method_id(name)")
+      .order("paid_on", { ascending: false })
+      .limit(500),
   ]);
+
+  const payoutsByAgent = new Map<string, PayoutRow[]>();
+  for (const p of (payoutsRes.data ?? []) as unknown as PayoutRow[]) {
+    payoutsByAgent.set(p.agent_id, [...(payoutsByAgent.get(p.agent_id) ?? []), p]);
+  }
 
   const statsById = new Map<string, AgentStats>();
   const stat = (id: string): AgentStats => {
@@ -183,6 +295,9 @@ export default async function AdminAgentsPage() {
   }
   for (const c of clientsRes.data ?? []) {
     if (c.referrer_id) stat(c.referrer_id as string).clients += 1;
+  }
+  for (const [agentId, list] of payoutsByAgent) {
+    stat(agentId).paidSum = list.reduce((s, p) => s + (p.amount ?? 0), 0);
   }
   for (const r of rewardsRes.data ?? []) {
     const s = stat(r.referrer_id as string);
@@ -220,7 +335,14 @@ export default async function AdminAgentsPage() {
       )}
       <div className="mt-4 space-y-3">
         {sorted.map((a) => (
-          <AgentCard key={a.id} a={a} stats={statsById.get(a.id) ?? EMPTY_STATS} />
+          <AgentCard
+            key={a.id}
+            a={a}
+            stats={statsById.get(a.id) ?? EMPTY_STATS}
+            payouts={payoutsByAgent.get(a.id) ?? []}
+            methods={methods}
+            today={today}
+          />
         ))}
       </div>
     </div>
