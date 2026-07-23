@@ -37,6 +37,11 @@ yarn-error.log*
 # исходники фото/видео (сотни МБ — GitHub такое не принимает, живут только локально)
 /photo_video/
 
+# рабочие заметки и промпты — живут только локально
+/.claude/
+/prompts/
+/description/
+
 # vercel
 .vercel
 
