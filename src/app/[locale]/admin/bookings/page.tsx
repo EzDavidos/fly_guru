@@ -11,6 +11,7 @@ import {
 } from "../actions";
 import { MANUAL_CHANNELS } from "@/lib/channels";
 import { resolveRefOwners, refOwnerLabel, type RefOwner } from "@/lib/refOwner";
+import { firstBasicTrainingByPhone } from "@/lib/agentReward";
 import { SaveForm } from "../SaveForm";
 import { getActiveDict } from "@/lib/dictionaries";
 import { BookingCreateForm } from "./BookingCreateForm";
@@ -96,6 +97,7 @@ function BookingCard({
   today,
   hasPendingReward,
   refOwner,
+  refDiscount,
   paymentMethods,
 }: {
   b: BookingRow;
@@ -104,6 +106,8 @@ function BookingCard({
   // Владелец реф-ссылки заявки: агент (скидка + награда) или инструктор
   // (просто «записался к нему»). undefined — код есть, а владельца не нашли.
   refOwner: RefOwner | undefined;
+  // Положена ли скидка этому гостю на самом деле; undefined — не проверяли.
+  refDiscount?: boolean;
   paymentMethods: { id: string; name: string }[];
 }) {
   const badge = statusBadge(b);
@@ -206,7 +210,7 @@ function BookingCard({
             {b.src && <p>Источник: {MANUAL_CHANNELS[b.src] ?? b.src}</p>}
             {/* Вместо сырого кода — имя того, кто привёл гостя, и правда про
                 скидку: её даёт только активная агентская ссылка (п.4/5). */}
-            {b.ref_code && <p>{refOwnerLabel(b.ref_code, refOwner)}</p>}
+            {b.ref_code && <p>{refOwnerLabel(b.ref_code, refOwner, refDiscount)}</p>}
             {utmEntries.map(([k, v]) => (
               <p key={k}>
                 {k}: {v}
@@ -480,6 +484,13 @@ export default async function AdminBookingsPage({
     bookings.map((b) => b.ref_code),
   );
 
+  // Кому из пришедших по агентской ссылке скидка реально положена. Спрашиваем
+  // только про них: у остальных заявок реф-строки нет, и проверять нечего.
+  const agentPhones = bookings
+    .filter((b) => b.ref_code && refOwners.get(b.ref_code)?.kind === "agent")
+    .map((b) => b.phone);
+  const refDiscounts = await firstBasicTrainingByPhone(supabase, agentPhones);
+
   const freshCount = all.filter((b) => b.status === "new").length;
 
   return (
@@ -534,6 +545,7 @@ export default async function AdminBookingsPage({
             today={today}
             hasPendingReward={!!b.client_id && pendingRewardClients.has(b.client_id)}
             refOwner={b.ref_code ? refOwners.get(b.ref_code) : undefined}
+            refDiscount={refDiscounts.get(b.phone)}
             paymentMethods={paymentMethods}
           />
         ))}

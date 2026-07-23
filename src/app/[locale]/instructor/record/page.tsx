@@ -5,6 +5,7 @@ import { getActiveDict } from "@/lib/dictionaries";
 import { CopyLink } from "@/app/[locale]/admin/CopyLink";
 import { RecordForm, type RecordPrefill } from "./RecordForm";
 import { createMyRefCodeAction } from "../actions";
+import { firstBasicTrainingByPhone } from "@/lib/agentReward";
 
 // «Записать клиента»: имя, телефон, услуга, дата → клиент + сессия.
 // Сценарий: оформить человека на пляже за 30 секунд сразу после занятия.
@@ -71,6 +72,12 @@ export default async function RecordPage({
           .eq("active", true)
           .maybeSingle();
         prefill.refIsAgent = Boolean(agent);
+        // Скидка положена только за ПЕРВОЕ базовое обучение: если гость уже
+        // катался, форма не должна её обещать (расчёт её и не даст).
+        if (prefill.refIsAgent) {
+          const known = await firstBasicTrainingByPhone(supabase, [booking.phone]);
+          prefill.refDiscount = known.get(booking.phone as string);
+        }
       }
     }
   }

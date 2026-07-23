@@ -4,6 +4,7 @@ import { getAppUser } from "@/lib/auth";
 import { vnToday } from "@/lib/dates";
 import { getActiveDict } from "@/lib/dictionaries";
 import { RecordClientForm, type RecordPrefill } from "./RecordClientForm";
+import { firstBasicTrainingByPhone } from "@/lib/agentReward";
 
 export const metadata: Metadata = { title: "Админка · Запись клиента" };
 
@@ -61,6 +62,22 @@ export default async function AdminRecordPage({
         telegram: booking.telegram_username,
         date: day && day <= today ? day : today,
       };
+      // Чей это код и положена ли гостю скидка — та же проверка, что делает
+      // расчёт чека: скидку даёт только активный агент и только за первое
+      // базовое обучение клиента.
+      if (booking.ref_code) {
+        const { data: agent } = await supabase
+          .from("agents")
+          .select("id")
+          .eq("ref_code", booking.ref_code)
+          .eq("active", true)
+          .maybeSingle();
+        prefill.refIsAgent = Boolean(agent);
+        if (prefill.refIsAgent) {
+          const known = await firstBasicTrainingByPhone(supabase, [booking.phone]);
+          prefill.refDiscount = known.get(booking.phone as string);
+        }
+      }
     }
   }
 

@@ -74,10 +74,20 @@ export async function resolveRefOwners(
 
 // Одна строка «кто привёл» для карточки заявки и для Telegram-уведомления —
 // чтобы формулировка была одна и та же в обоих местах.
-export function refOwnerLabel(code: string, owner: RefOwner | undefined): string {
+// discount — положена ли гостю скидка на самом деле (см. firstBasicTrainingByPhone
+// в lib/agentReward): скидка даётся только за ПЕРВОЕ базовое обучение, и у гостя,
+// который уже катался, её не будет. undefined = проверить не смогли; тогда просто
+// не говорим про скидку, вместо того чтобы обещать несуществующее.
+export function refOwnerLabel(
+  code: string,
+  owner: RefOwner | undefined,
+  discount?: boolean,
+): string {
   if (!owner) return `Реф-ссылка: владелец не найден (${code})`;
   if (owner.kind === "instructor") return `Личная ссылка инструктора: ${owner.name} · скидки нет`;
-  return owner.active
-    ? `Агент: ${owner.name} · скидка 10% на обучение`
-    : `Агент: ${owner.name} (отключён — скидки нет)`;
+  if (!owner.active) return `Агент: ${owner.name} (отключён — скидки нет)`;
+  if (discount === true) return `Агент: ${owner.name} · скидка 10% на первое обучение`;
+  if (discount === false)
+    return `Агент: ${owner.name} · скидки нет — клиент уже проходил обучение`;
+  return `Агент: ${owner.name}`;
 }

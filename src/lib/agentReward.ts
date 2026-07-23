@@ -1,4 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
+import type { createAdminClient } from "@/lib/supabase/admin";
+import { phonesMatch } from "@/lib/phone";
 
 // Когда агент зарабатывает на приведённом клиенте (пачка правок №6, п.5).
 //
@@ -14,7 +16,11 @@ import type { createClient } from "@/lib/supabase/server";
 // Скидка −10% живёт по тому же правилу: она даётся вместе с наградой, за
 // первое базовое обучение. Второй раз по той же ссылке — уже без скидки.
 
-type Supabase = Awaited<ReturnType<typeof createClient>>;
+// Сайтовый роут заявок ходит service_role клиентом (гость не залогинен),
+// кабинеты — обычным: правило одно, клиент разный.
+type Supabase =
+  | Awaited<ReturnType<typeof createClient>>
+  | ReturnType<typeof createAdminClient>;
 
 /** Скидка клиенту по агентской ссылке. */
 export const REF_DISCOUNT_RATE = 0.1;
@@ -70,6 +76,65 @@ export async function agentRewardApplies(
 ): Promise<boolean> {
   if (!hasAgent || !isBasicTraining(serviceCode)) return false;
   return !(await hasEarlierBasicTraining(supabase, clientId));
+}
+
+/**
+ * То же правило, но ДО оформления, когда клиента ещё не опознали: на руках
+ * только телефон из заявки. Нужно интерфейсу — карточка заявки и форма записи
+ * обещали «скидка 10%» любому, кто пришёл по ссылке агента, хотя второй раз
+ * скидки уже не будет (пачка №6, п.5 закрыла расчёт, но не подписи).
+ *
+ * Возвращает по телефону: true — гость на скидку претендует (в базе его нет
+ * или базового обучения у него не было), false — уже проходил обучение.
+ * Телефоны, которые не удалось проверить, в карту просто не попадают — тогда
+ * интерфейс не обещает ничего, вместо того чтобы соврать в любую сторону.
+ *
+ * Два запроса на всю страницу, а не по паре на карточку: клиентов и их базовые
+ * сессии забираем пачкой, дальше сверяем телефоны в памяти (`phonesMatch` —
+ * тот же матчер, что при оформлении, ищет по последним 9 цифрам).
+ */
+export async function firstBasicTrainingByPhone(
+  supabase: Supabase,
+  phones: (string | null | undefined)[],
+): Promise<Map<string, boolean>> {
+  const wanted = [...new Set(phones.filter(Boolean) as string[])];
+  const result = new Map<string, boolean>();
+  if (wanted.length === 0) return result;
+
+  const { data: clients, error } = await supabase
+    .from("clients")
+    .select("id, phone")
+    .not("phone", "is", null)
+    .limit(1000);
+  if (error) {
+    console.error("[agentReward] clients load failed:", error.message);
+    return result; // не знаем — значит молчим
+  }
+
+  // Телефон → карточка клиента. Незнакомый номер = новый гость, скидка положена.
+  const matched = new Map<string, string>();
+  for (const phone of wanted) {
+    const hit = (clients ?? []).find((c) => phonesMatch(c.phone as string, phone));
+    if (hit) matched.set(phone, hit.id as string);
+    else result.set(phone, true);
+  }
+  if (matched.size === 0) return result;
+
+  const ids = [...new Set(matched.values())];
+  const { data: trained, error: sesError } = await supabase
+    .from("sessions")
+    .select("client_id, services!inner(code)")
+    .in("client_id", ids)
+    .in("services.code", BASIC_TRAINING_CODES);
+  if (sesError) {
+    console.error("[agentReward] previous trainings load failed:", sesError.message);
+    return result;
+  }
+  const trainedIds = new Set((trained ?? []).map((s) => s.client_id as string));
+  for (const [phone, clientId] of matched) {
+    result.set(phone, !trainedIds.has(clientId));
+  }
+  return result;
 }
 
 /** Чек со скидкой, если она положена. */

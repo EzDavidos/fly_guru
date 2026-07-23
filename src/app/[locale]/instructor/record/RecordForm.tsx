@@ -14,6 +14,9 @@ export interface RecordPrefill {
   serviceId?: string;
   refCode?: string | null;
   refIsAgent?: boolean; // код агента (скидка) или инструктора (без скидки)
+  // Положена ли скидка ЭТОМУ гостю: она даётся за первое базовое обучение,
+  // и повторному клиенту по той же ссылке её уже не будет.
+  refDiscount?: boolean;
   telegram?: string | null;
 }
 
@@ -43,10 +46,20 @@ export function RecordForm({
 
       {prefill?.refCode &&
         (prefill.refIsAgent ? (
-          <p className="rounded-xl bg-accent/10 px-4 py-3 text-sm font-medium text-accent-strong">
-            Заявка по агентской ссылке «{prefill.refCode}» — на базовое обучение
-            автоматически применится скидка 10%.
-          </p>
+          prefill.refDiscount === false ? (
+            // Гость уже проходил у нас базовое обучение — скидка положена
+            // только за первое, и второй раз система её не даст. Раньше
+            // подпись обещала её всё равно (пачка №6, п.5 — хвост по тексту).
+            <p className="rounded-xl bg-line/40 px-4 py-3 text-sm text-muted">
+              Заявка по агентской ссылке «{prefill.refCode}». Скидки нет — клиент
+              уже проходил обучение, она даётся только за первое.
+            </p>
+          ) : (
+            <p className="rounded-xl bg-accent/10 px-4 py-3 text-sm font-medium text-accent-strong">
+              Заявка по агентской ссылке «{prefill.refCode}» — на первое базовое
+              обучение автоматически применится скидка 10%.
+            </p>
+          )
         ) : (
           <p className="rounded-xl bg-line/40 px-4 py-3 text-sm text-muted">
             Заявка по реф-ссылке инструктора «{prefill.refCode}». Скидки нет — она

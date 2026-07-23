@@ -23,6 +23,9 @@ export interface RecordPrefill {
   phone?: string;
   serviceId?: string;
   refCode?: string | null;
+  refIsAgent?: boolean; // код агента (скидка) или инструктора (без скидки)
+  // Положена ли скидка ЭТОМУ гостю: только за первое базовое обучение.
+  refDiscount?: boolean;
   telegram?: string | null;
   date?: string; // дата из заявки — на неё и ляжет занятие
 }
@@ -63,12 +66,27 @@ export function RecordClientForm({
         <input type="hidden" name="bookingId" value={prefill.bookingId} />
       )}
 
-      {prefill?.refCode && (
-        <p className="rounded-xl bg-accent/10 px-3 py-2 text-sm font-medium text-accent-strong">
-          Заявка по реф-ссылке «{prefill.refCode}» — если это код агента, к базовому
-          обучению применится скидка 200 000 ₫ (при пустой сумме).
-        </p>
-      )}
+      {/* Что скажет расчёт при пустой сумме. Раньше здесь было «скидка
+          200 000 ₫, если это код агента» — сумма устарела (теперь 10%), а
+          «если» перекладывало проверку на человека. Смотрим сами: чей код и
+          положена ли гостю скидка (она даётся за ПЕРВОЕ базовое обучение). */}
+      {prefill?.refCode &&
+        (!prefill.refIsAgent ? (
+          <p className="rounded-xl bg-line/40 px-3 py-2 text-sm text-muted">
+            Заявка по реф-ссылке инструктора «{prefill.refCode}». Скидки нет — она
+            действует только по агентским ссылкам.
+          </p>
+        ) : prefill.refDiscount === false ? (
+          <p className="rounded-xl bg-line/40 px-3 py-2 text-sm text-muted">
+            Заявка по агентской ссылке «{prefill.refCode}». Скидки нет — клиент уже
+            проходил обучение, она даётся только за первое.
+          </p>
+        ) : (
+          <p className="rounded-xl bg-accent/10 px-3 py-2 text-sm font-medium text-accent-strong">
+            Заявка по агентской ссылке «{prefill.refCode}» — к первому базовому
+            обучению применится скидка 10% (при пустой сумме).
+          </p>
+        ))}
 
       {/* Дата — компактная (как в расходах), «Инструктор» занимает остаток
           строки. Одной высоты, выровнены по низу. */}

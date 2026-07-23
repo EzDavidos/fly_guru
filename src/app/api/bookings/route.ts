@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import { sendBookingNotification } from "@/lib/telegram";
 import { isValidPhone, normalizeTelegram, phoneDigits } from "@/lib/phone";
 import { resolveRefOwners, refOwnerLabel } from "@/lib/refOwner";
+import { firstBasicTrainingByPhone } from "@/lib/agentReward";
 
 // «Серверная дверь» для заявок с форм. Форма шлёт сюда данные, а здесь мы их
 // проверяем, защищаем от спама и сохраняем в таблицу bookings.
@@ -135,7 +136,14 @@ export async function POST(req: NextRequest) {
   let refLine: string | null = null;
   if (refCode) {
     const owners = await resolveRefOwners(supabase, [refCode]);
-    refLine = refOwnerLabel(refCode, owners.get(refCode));
+    const owner = owners.get(refCode);
+    // Скидку обещаем в чате, только если она действительно будет: повторному
+    // гостю по той же ссылке её уже не дадут (скидка — за первое обучение).
+    const discount =
+      owner?.kind === "agent" && owner.active
+        ? (await firstBasicTrainingByPhone(supabase, [contact])).get(contact)
+        : undefined;
+    refLine = refOwnerLabel(refCode, owner, discount);
   }
 
   await sendBookingNotification({
