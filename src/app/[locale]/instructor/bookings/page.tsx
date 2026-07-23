@@ -96,8 +96,14 @@ export default async function InstructorBookingsPage() {
                 </div>
               </div>
 
-              <div className="mt-2 space-y-0.5 text-sm text-muted">
-                {b.services?.name && <p>{b.services.name}</p>}
+              {/* Услуга — отдельной крупной строкой: инструктору важнее всего
+                  знать, что именно он катает, а раньше она терялась мелким
+                  серым текстом рядом с возрастом (prompts 3, п.2). */}
+              {b.services?.name && (
+                <p className="mt-2 text-base font-semibold text-ink">{b.services.name}</p>
+              )}
+
+              <div className="mt-1 space-y-0.5 text-sm text-muted">
                 <p>
                   {b.age != null && <>Возраст: {b.age}</>}
                   {b.age != null && b.weight != null && " · "}

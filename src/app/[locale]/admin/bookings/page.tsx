@@ -116,12 +116,15 @@ function BookingCard({
             )}
             {b.client_name}
           </p>
+          {/* Услуга — своей строкой и заметно: раньше она шла мелким серым
+              текстом вперемешку с датой и терялась (prompts 3, п.2). */}
+          <p
+            className={`truncate text-sm font-semibold ${terminal ? "text-muted" : "text-ink"}`}
+          >
+            {b.services?.name ?? "Услуга не указана"}
+          </p>
           <p className="truncate text-xs text-muted">
-            {[
-              b.services?.name,
-              b.preferred_date === today ? "Сегодня" : b.preferred_date,
-              b.scheduled_time,
-            ]
+            {[b.preferred_date === today ? "Сегодня" : b.preferred_date, b.scheduled_time]
               .filter(Boolean)
               .join(" · ") || "Детали не заполнены"}
           </p>
