@@ -443,6 +443,13 @@ export async function updateSessionAction(formData: FormData) {
   if (amount !== null) patch.amount = amount;
   const instructorId = String(formData.get("instructorId") ?? "");
   if (instructorId) patch.instructor_id = instructorId;
+  // Формат оплаты, в отличие от остальных полей, разрешаем и СТИРАТЬ: пустое
+  // значение здесь — это осознанный выбор «— не указан —» в списке, а не
+  // «поле не трогаем». Select приходит с каждой отправкой формы, поэтому
+  // отличить одно от другого можно по наличию ключа в самой форме.
+  if (formData.has("paymentMethodId")) {
+    patch.payment_method_id = String(formData.get("paymentMethodId") ?? "") || null;
+  }
 
   const supabase = await createClient();
   const serviceId = String(formData.get("serviceId") ?? "");
@@ -591,14 +598,18 @@ export async function togglePaidAction(formData: FormData) {
   if (!id) return;
 
   let paidAt: string | null = null;
+  // Отмечаем оплату — записываем и чем заплатили. Снимаем отметку — стираем
+  // способ вместе с ней: оплаты не было, значит и формата у неё нет.
+  let paymentMethodId: string | null = null;
   if (formData.get("set") === "1") {
     const day = String(formData.get("paidDate") ?? "").trim();
     paidAt = DAY_RE.test(day) ? dayToIso(day) : new Date().toISOString();
+    paymentMethodId = String(formData.get("paymentMethodId") ?? "").trim() || null;
   }
   const supabase = await createClient();
   const { error } = await supabase
     .from("subscriptions")
-    .update({ paid_at: paidAt })
+    .update({ paid_at: paidAt, payment_method_id: paymentMethodId })
     .eq("id", id);
   failIfError(error, "не удалось изменить отметку оплаты");
   revalidatePath("/", "layout");
