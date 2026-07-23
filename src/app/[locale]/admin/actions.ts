@@ -607,6 +607,48 @@ export async function adjustMinutesAction(
   redirect("/admin/subscriptions");
 }
 
+// Отмена абонемента (пачка №5, п.13): продажа не состоялась — клиент передумал,
+// вернули деньги. В отличие от удаления карточка остаётся: видно, что продажа
+// была и чем кончилась, а списания и корректировки никуда не деваются.
+//
+// Отметку оплаты снимаем: отменённый абонемент не должен висеть в выручке
+// месяца и в комиссии продавца. Обратно её ставят руками — старую дату оплаты
+// мы не помним и выдумывать её нельзя.
+export async function cancelSubscriptionAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+
+  if (formData.get("set") === "0") {
+    // Возврат из отменённых: статус пересчитываем по факту — срок мог выйти,
+    // пока абонемент лежал в отменённых, а минуты могли быть откатаны.
+    const { data: sub } = await supabase
+      .from("subscriptions")
+      .select("id, total_minutes, expires_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (!sub) return;
+    const left = await minutesLeft(supabase, sub);
+    const expired = sub.expires_at !== null && new Date(sub.expires_at) < new Date();
+    const status = expired ? "expired" : left <= 0 ? "used_up" : "active";
+    const { error } = await supabase
+      .from("subscriptions")
+      .update({ status })
+      .eq("id", id);
+    failIfError(error, "не удалось вернуть абонемент из отменённых");
+  } else {
+    const { error } = await supabase
+      .from("subscriptions")
+      .update({ status: "cancelled", paid_at: null })
+      .eq("id", id);
+    failIfError(error, "не удалось отменить абонемент");
+  }
+
+  revalidatePath("/", "layout");
+}
+
 // Удаление абонемента: вместе с ним удаляются его списания (иначе FK оставит
 // «пустые» сессии без абонемента) и корректировки (cascade в БД). Выручка и
 // комиссия месяца оплаты пересчитаются сами. Членство клиента не трогаем.
@@ -623,6 +665,60 @@ export async function deleteSubscriptionAction(formData: FormData) {
   failIfError(sessionsError, "не удалось удалить списания абонемента");
   const { error } = await supabase.from("subscriptions").delete().eq("id", id);
   failIfError(error, "не удалось удалить абонемент");
+  revalidatePath("/", "layout");
+}
+
+// ── Выплаты агентам (пачка №5, п.7) ──────────────────────────────────────────
+// Награда агента и выплата денег — разные вещи. referral_rewards помнит, что
+// награда ЗАРАБОТАНА (клиент пришёл и откатал), а agent_payouts — что деньги
+// реально отданы: сколько, чем и когда. «К выплате» = подтверждённые награды
+// минус сумма выплат.
+//
+// В расходы школы выплата не идёт: комиссия агента уже попала в расходы в
+// момент начисления (sessions.agent_commission, см. lib/finance.ts). Считать её
+// второй раз при выплате — задвоить одни и те же деньги.
+export async function payAgentAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const supabase = await createClient();
+
+  const agentId = String(formData.get("agentId") ?? "");
+  if (!agentId) return { error: "Не понял, какому агенту выплата." };
+
+  const amount = parseVnd(String(formData.get("amount") ?? "").trim());
+  if (amount === null || amount <= 0) {
+    return { error: "Сумма — число в донгах больше нуля, например 300 000." };
+  }
+
+  const day = String(formData.get("paidOn") ?? "").trim();
+  if (!DAY_RE.test(day)) return { error: "Укажите дату выплаты." };
+
+  const { error } = await supabase.from("agent_payouts").insert({
+    agent_id: agentId,
+    amount,
+    method_id: String(formData.get("methodId") ?? "") || null,
+    paid_on: day,
+    comment: String(formData.get("comment") ?? "").trim() || null,
+    created_by: admin.id,
+  });
+  if (error) return { error: `Не удалось сохранить выплату: ${error.message}` };
+
+  revalidatePath("/", "layout");
+  redirect("/admin/agents");
+}
+
+// Ошиблись суммой или датой — выплату можно снести. Отдельного «редактировать»
+// не делаем: удалить и внести заново проще и честнее в истории.
+export async function deleteAgentPayoutAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("agent_payouts").delete().eq("id", id);
+  failIfError(error, "не удалось удалить выплату");
   revalidatePath("/", "layout");
 }
 

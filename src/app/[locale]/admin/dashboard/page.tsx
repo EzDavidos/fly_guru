@@ -191,7 +191,8 @@ export default async function AdminDashboardPage({
         .gte("paid_at", range.fromIso)
         .lt("paid_at", range.toIso),
       // Дебиторка всей школы (не периода): проданные, но неоплаченные.
-      supabase.from("subscriptions").select("price").is("paid_at", null),
+      // Отменённые отсеиваем в JS ниже — с них уже никто не заплатит (п.13).
+      supabase.from("subscriptions").select("price, status").is("paid_at", null),
       supabase
         .from("clients")
         .select("id")
@@ -207,7 +208,7 @@ export default async function AdminDashboardPage({
   const sessions = (sessionsRes.data ?? []) as unknown as VisitRow[];
   const paidSubs = paidSubsRes.data ?? [];
   const paidSubsSum = paidSubs.reduce((s, r) => s + (r.price ?? 0), 0);
-  const unpaid = unpaidSubsRes.data ?? [];
+  const unpaid = (unpaidSubsRes.data ?? []).filter((r) => r.status !== "cancelled");
   const unpaidSum = unpaid.reduce((s, r) => s + (r.price ?? 0), 0);
 
   // Визиты клиента за всё время (не за период).

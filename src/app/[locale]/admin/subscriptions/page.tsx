@@ -3,7 +3,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { vnToday } from "@/lib/dates";
 import { vnd } from "@/lib/stats";
-import { deleteSubscriptionAction, togglePaidAction } from "../actions";
+import {
+  cancelSubscriptionAction,
+  deleteSubscriptionAction,
+  togglePaidAction,
+} from "../actions";
 import { ConfirmSubmit } from "../ConfirmSubmit";
 import { SellSubscriptionForm, AdjustMinutesForm } from "./SubscriptionForms";
 
@@ -52,20 +56,25 @@ function SubscriptionCard({
   history: HistoryItem[];
   today: string;
 }) {
+  // Отменённый — продажа не состоялась (п.13). Проверяем первым: у него могли
+  // и минуты кончиться, и срок выйти, но человеку важно одно — он отменён.
+  const cancelled = s.status === "cancelled";
   const expired =
     s.status === "expired" ||
     (s.expires_at !== null && new Date(s.expires_at) < new Date());
   // «Сгорел» — истёк, а минуты остались: клиент их не откатал, деньги за них
   // школа получила. Именно это админ хотел видеть (пак E, пункт 9).
-  const burned = expired && left > 0;
+  const burned = !cancelled && expired && left > 0;
 
-  const statusLabel = burned
-    ? { text: `Сгорело ${left} мин`, cls: "bg-red-500/10 text-red-600" }
-    : expired
-      ? { text: "Истёк", cls: "bg-line text-muted" }
-      : s.status === "used_up"
-        ? { text: "Минуты кончились", cls: "bg-line text-muted" }
-        : { text: `${left} мин`, cls: "bg-primary/10 text-primary" };
+  const statusLabel = cancelled
+    ? { text: "Отменён", cls: "bg-line text-muted" }
+    : burned
+      ? { text: `Сгорело ${left} мин`, cls: "bg-red-500/10 text-red-600" }
+      : expired
+        ? { text: "Истёк", cls: "bg-line text-muted" }
+        : s.status === "used_up"
+          ? { text: "Минуты кончились", cls: "bg-line text-muted" }
+          : { text: `${left} мин`, cls: "bg-primary/10 text-primary" };
 
   return (
     <details className="group rounded-2xl border border-line bg-surface">
@@ -76,15 +85,19 @@ function SubscriptionCard({
             {fmtDay(s.sold_at)} · {vnd(s.price)} · продал {s.seller?.name ?? "—"}
           </p>
         </div>
-        <span
-          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-            s.paid_at
-              ? "bg-emerald-500/10 text-emerald-600"
-              : "bg-amber-500/10 text-amber-600"
-          }`}
-        >
-          {s.paid_at ? `Оплачен ${fmtDay(s.paid_at)}` : "Ожидает оплаты"}
-        </span>
+        {/* У отменённого отметки оплаты нет по определению — не пугаем
+            «ожидает оплаты» там, где платить уже нечего. */}
+        {!cancelled && (
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              s.paid_at
+                ? "bg-emerald-500/10 text-emerald-600"
+                : "bg-amber-500/10 text-amber-600"
+            }`}
+          >
+            {s.paid_at ? `Оплачен ${fmtDay(s.paid_at)}` : "Ожидает оплаты"}
+          </span>
+        )}
         <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusLabel.cls}`}>
           {statusLabel.text}
         </span>
@@ -97,7 +110,9 @@ function SubscriptionCard({
           {s.total_minutes} · истекает {fmtDay(s.expires_at)}
         </p>
 
-        {/* Отметка оплаты */}
+        {/* Отметка оплаты. У отменённого её нет: пока он в отменённых, деньги
+            не должны попадать ни в выручку, ни в комиссию продавца. */}
+        {!cancelled && (
         <form action={togglePaidAction} className="mt-3">
           <input type="hidden" name="id" value={s.id} />
           {s.paid_at ? (
@@ -132,9 +147,10 @@ function SubscriptionCard({
             </div>
           )}
         </form>
+        )}
 
         {/* Корректировка минут */}
-        <AdjustMinutesForm subscriptionId={s.id} />
+        {!cancelled && <AdjustMinutesForm subscriptionId={s.id} />}
 
         {/* История: списания + корректировки */}
         {history.length > 0 && (
@@ -148,7 +164,34 @@ function SubscriptionCard({
           </div>
         )}
 
-        <form action={deleteSubscriptionAction} className="mt-4 border-t border-line/70 pt-3">
+        {/* Отмена — мягкая альтернатива удалению: карточка и история остаются,
+            абонемент уходит во вкладку «Отменённые» (п.13). */}
+        <form action={cancelSubscriptionAction} className="mt-4 border-t border-line/70 pt-3">
+          <input type="hidden" name="id" value={s.id} />
+          {cancelled ? (
+            <>
+              <input type="hidden" name="set" value="0" />
+              <ConfirmSubmit
+                message="Вернуть абонемент из отменённых? Статус пересчитается по остатку минут и сроку, а отметку оплаты нужно будет поставить заново."
+                className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+              >
+                Вернуть в активные
+              </ConfirmSubmit>
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="set" value="1" />
+              <ConfirmSubmit
+                message="Отменить абонемент? Он уйдёт во вкладку «Отменённые», отметка оплаты снимется — из выручки и комиссии продавца он выпадет. Списания и корректировки останутся."
+                className="rounded-full border border-line px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-red-500 hover:text-red-500"
+              >
+                Отменить абонемент
+              </ConfirmSubmit>
+            </>
+          )}
+        </form>
+
+        <form action={deleteSubscriptionAction} className="mt-3">
           <input type="hidden" name="id" value={s.id} />
           <ConfirmSubmit
             message="Удалить абонемент? Его списания и корректировки удалятся безвозвратно, выручка и комиссия за месяц оплаты пересчитаются. Членство клиента останется."
@@ -207,6 +250,11 @@ export default async function AdminSubscriptionsPage({
     subsQuery = subsQuery
       .lt("expires_at", new Date().toISOString())
       .neq("status", "used_up");
+  } else if (f === "archive") {
+    // Архив — закончившиеся: срок вышел или минуты откатаны (п.13).
+    subsQuery = subsQuery.in("status", ["expired", "used_up"]);
+  } else if (f === "cancelled") {
+    subsQuery = subsQuery.eq("status", "cancelled");
   } else if (f !== "all") {
     subsQuery = subsQuery.eq("status", "active");
   }
@@ -272,8 +320,13 @@ export default async function AdminSubscriptionsPage({
   // для отбора «сгоревших» (истёк с ненулевым остатком).
   const leftOf = (s: SubRow) =>
     s.total_minutes + (adjBySub.get(s.id) ?? 0) - (usedBySub.get(s.id) ?? 0);
+  // «Сгоревшие» — только с ненулевым остатком; отменённые сюда не относятся
+  // (деньги вернули, гореть нечему). Отсев в JS, а не в запросе: так экран не
+  // ломается на проектах, где миграцию 0023 ещё не накатили.
   const visibleSubs =
-    f === "burned" ? subs.filter((s) => leftOf(s) > 0) : subs;
+    f === "burned"
+      ? subs.filter((s) => leftOf(s) > 0 && s.status !== "cancelled")
+      : subs;
 
   return (
     <div>
@@ -302,10 +355,12 @@ export default async function AdminSubscriptionsPage({
         </div>
       </details>
 
-      <div className="mt-4 flex gap-1.5">
+      <div className="mt-4 flex flex-wrap gap-1.5">
         {[
           { key: "", label: "Активные" },
           { key: "burned", label: "Сгоревшие" },
+          { key: "archive", label: "Архив" },
+          { key: "cancelled", label: "Отменённые" },
           { key: "all", label: "Все" },
         ].map((tab) => (
           <Link
@@ -326,7 +381,11 @@ export default async function AdminSubscriptionsPage({
         <p className="mt-6 text-sm text-muted">
           {f === "burned"
             ? "Сгоревших абонементов нет — ни у кого минуты не прогорели."
-            : "Абонементов пока нет."}
+            : f === "archive"
+              ? "В архиве пусто — ни один абонемент ещё не закончился."
+              : f === "cancelled"
+                ? "Отменённых абонементов нет."
+                : "Абонементов пока нет."}
         </p>
       )}
       <div className="mt-4 space-y-3">
