@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { sendBookingNotification } from "@/lib/telegram";
 import { isValidPhone, normalizeTelegram, phoneDigits } from "@/lib/phone";
+import { resolveRefOwners, refOwnerLabel } from "@/lib/refOwner";
 
 // «Серверная дверь» для заявок с форм. Форма шлёт сюда данные, а здесь мы их
 // проверяем, защищаем от спама и сохраняем в таблицу bookings.
@@ -129,13 +130,21 @@ export async function POST(req: NextRequest) {
     serviceName = data?.name ?? null;
   }
 
+  // Реф-код расшифровываем в имя: в чате нужно сразу видеть, агент это (тогда
+  // будет скидка и награда) или личная ссылка инструктора.
+  let refLine: string | null = null;
+  if (refCode) {
+    const owners = await resolveRefOwners(supabase, [refCode]);
+    refLine = refOwnerLabel(refCode, owners.get(refCode));
+  }
+
   await sendBookingNotification({
     serviceName,
     clientName,
     contact,
     messenger,
     preferredDate,
-    refCode,
+    refLine,
     src,
     comment,
   });

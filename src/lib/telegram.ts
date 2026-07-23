@@ -14,7 +14,9 @@ interface BookingNotification {
   contact: string; // телефон/мессенджер как ввёл гость
   messenger?: string | null; // WhatsApp/Telegram/Zalo
   preferredDate?: string | null;
-  refCode?: string | null;
+  // Готовая строка «кто привёл» (см. lib/refOwner). Сырой код не шлём: он
+  // ничего не говорит тому, кто читает заявку в чате (пачка №5, п.5).
+  refLine?: string | null;
   src?: string | null; // источник (instagram, qr…)
   comment?: string | null;
 }
@@ -40,7 +42,7 @@ export async function sendBookingNotification(
   lines.push(`📞 Контакт: ${contactLine}`);
   if (b.preferredDate) lines.push(`📅 Дата: ${b.preferredDate}`);
   if (b.comment) lines.push(`💬 Комментарий: ${b.comment}`);
-  if (b.refCode) lines.push(`🎟️ Реф-код: ${b.refCode}`);
+  if (b.refLine) lines.push(`🎟️ ${b.refLine}`);
   if (b.src) lines.push(`🧭 Источник: ${b.src}`);
 
   await sendTelegram(chatId, lines.join("\n"));

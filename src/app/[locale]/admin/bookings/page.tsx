@@ -10,6 +10,7 @@ import {
   rescheduleAction,
 } from "../actions";
 import { MANUAL_CHANNELS } from "@/lib/channels";
+import { resolveRefOwners, refOwnerLabel, type RefOwner } from "@/lib/refOwner";
 import { SaveForm } from "../SaveForm";
 import { getActiveDict } from "@/lib/dictionaries";
 import { BookingCreateForm } from "./BookingCreateForm";
@@ -84,10 +85,14 @@ function BookingCard({
   b,
   today,
   hasPendingReward,
+  refOwner,
 }: {
   b: BookingRow;
   today: string;
   hasPendingReward: boolean;
+  // Владелец реф-ссылки заявки: агент (скидка + награда) или инструктор
+  // (просто «записался к нему»). undefined — код есть, а владельца не нашли.
+  refOwner: RefOwner | undefined;
 }) {
   const badge = statusBadge(b);
   const terminal = TERMINAL.includes(b.status);
@@ -161,7 +166,9 @@ function BookingCard({
         {(b.src || b.ref_code || utmEntries.length > 0) && (
           <div className="mt-2 space-y-0.5 rounded-xl bg-line/30 px-3 py-2 text-xs text-muted">
             {b.src && <p>Источник: {MANUAL_CHANNELS[b.src] ?? b.src}</p>}
-            {b.ref_code && <p>Реф-код: {b.ref_code} (скидка 200 000 ₫ на базовое)</p>}
+            {/* Вместо сырого кода — имя того, кто привёл гостя, и правда про
+                скидку: её даёт только активная агентская ссылка (п.4/5). */}
+            {b.ref_code && <p>{refOwnerLabel(b.ref_code, refOwner)}</p>}
             {utmEntries.map(([k, v]) => (
               <p key={k}>
                 {k}: {v}
@@ -404,6 +411,12 @@ export default async function AdminBookingsPage({
     pendingRewardClients = new Set((rewards ?? []).map((r) => r.client_id as string));
   }
 
+  // Реф-коды видимых заявок → имена владельцев ссылок (агент или инструктор).
+  const refOwners = await resolveRefOwners(
+    supabase,
+    bookings.map((b) => b.ref_code),
+  );
+
   const freshCount = all.filter((b) => b.status === "new").length;
 
   return (
@@ -457,6 +470,7 @@ export default async function AdminBookingsPage({
             b={b}
             today={today}
             hasPendingReward={!!b.client_id && pendingRewardClients.has(b.client_id)}
+            refOwner={b.ref_code ? refOwners.get(b.ref_code) : undefined}
           />
         ))}
       </div>
