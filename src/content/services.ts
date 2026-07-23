@@ -27,16 +27,17 @@ export const services: Service[] = [
   // ── Обучение ──
   { id: "basic-adult", name: "Базовое обучение (взрослый)", durationMin: 60, price: 2_000_000, category: "training" },
   { id: "basic-kid", name: "Базовое обучение (до 14 лет)", durationMin: 60, price: 1_500_000, category: "training" },
-  { id: "basic-duo", name: "Базовое обучение вдвоём", durationMin: 60, price: 3_500_000, category: "training" },
+  { id: "individual-training", name: "Индивидуальное обучающее занятие", durationMin: 60, price: 3_000_000, category: "training" },
+  { id: "basic-duo", name: "Парное базовое обучение", durationMin: 60, price: 3_500_000, category: "training" },
 
   // ── Тандем ──
-  { id: "tandem-adult", name: "Тандем с инструктором (взрослый)", durationMin: 5, price: 1_000_000, category: "tandem" },
-  { id: "tandem-kid", name: "Тандем с инструктором (до 14 лет)", durationMin: 5, price: 500_000, category: "tandem" },
+  { id: "tandem-adult", name: "Полёт в тандеме (взрослый)", durationMin: 10, price: 1_000_000, category: "tandem" },
+  { id: "tandem-kid", name: "Полёт в тандеме (до 14 лет)", durationMin: 10, price: 500_000, category: "tandem" },
 
   // ── Выезды (только для членов клуба) ──
   {
     id: "excursion",
-    name: "Экскурсия на остров Черепахи",
+    name: "Экскурсия с инструктором",
     durationMin: 120,
     price: 3_500_000,
     category: "tour",
@@ -45,22 +46,23 @@ export const services: Service[] = [
   },
   {
     id: "safari",
-    name: "Сафари",
+    name: "E-Foil Safari",
     durationMin: null,
-    durationLabel: "5–6 часов",
+    durationLabel: "5 часов",
     price: 6_000_000,
     category: "tour",
     membersOnly: true,
   },
 
   // ── Прокат ──
-  { id: "rental", name: "Самостоятельный прокат (после обучения)", durationMin: 30, price: 1_000_000, category: "rental" },
+  { id: "rental", name: "Самостоятельное катание", durationMin: 30, price: 1_000_000, category: "rental" },
 
   // ── Абонемент ──
-  { id: "subscription", name: "Абонемент", durationMin: 300, price: 6_000_000, category: "subscription" },
+  { id: "subscription", name: "Абонемент 300 минут", durationMin: 300, price: 6_000_000, category: "subscription" },
 
   // ── Доп. услуги ──
-  { id: "video", name: "Видеосъёмка полёта (Insta360, монтаж)", durationMin: null, durationLabel: "—", price: 1_200_000, category: "extra" },
+  { id: "video", name: "Фото/видео с монтажом", durationMin: null, durationLabel: "—", price: 1_200_000, category: "extra" },
+  { id: "video-raw", name: "Фото/видео без монтажа", durationMin: null, durationLabel: "—", price: 600_000, category: "extra" },
 ];
 
 export function getService(id: string): Service {

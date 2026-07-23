@@ -29,10 +29,10 @@ export default async function TandemPage() {
           <div className="grid items-center gap-10 md:grid-cols-12">
             <div className="md:col-span-7">
               <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-primary">
-                Тандем с инструктором
+                Полёт в тандеме
               </p>
               <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
-                Попробуйте полёт за 5 минут
+                Попробуйте полёт за 10 минут
               </h1>
               <p className="mt-4 max-w-lg text-lg text-muted">
                 Самый простой способ понять, что такое электрофойл. Вы садитесь на доску
@@ -59,7 +59,7 @@ export default async function TandemPage() {
 
       <Section tone="muted">
         <Container>
-          <SectionHeading eyebrow="Цены" title="5 минут полёта" />
+          <SectionHeading eyebrow="Цены" title="10 минут полёта" />
           <div className="mt-10 grid gap-6 sm:grid-cols-2 md:max-w-2xl">
             {options.map((s) => (
               <Card key={s.id}>

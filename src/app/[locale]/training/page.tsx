@@ -24,9 +24,10 @@ export default async function TrainingPage() {
   )?.id;
 
   const options = [
-    { s: pickService(site, "basic-adult"), highlight: true, desc: "Индивидуальное занятие для взрослого с нуля." },
+    { s: pickService(site, "basic-adult"), highlight: true, desc: "Первое знакомство с eFoil под руководством инструктора." },
     { s: pickService(site, "basic-kid"), highlight: false, desc: "Отдельная программа для детей до 14 лет." },
-    { s: pickService(site, "basic-duo"), highlight: false, desc: "Учитесь вдвоём — по очереди на одной доске." },
+    { s: pickService(site, "individual-training"), highlight: false, desc: "Углублённое занятие один на один с инструктором." },
+    { s: pickService(site, "basic-duo"), highlight: false, desc: "Совместное обучение для двух человек с инструктором." },
   ];
 
   return (
@@ -61,11 +62,11 @@ export default async function TrainingPage() {
         </Container>
       </Section>
 
-      {/* Три варианта обучения */}
+      {/* Четыре варианта обучения (в 0024 добавилось индивидуальное занятие) */}
       <Section tone="muted">
         <Container>
           <SectionHeading eyebrow="Форматы" title="Выберите вариант" />
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {options.map(({ s, highlight, desc }) => (
               <Card key={s.id} className={highlight ? "ring-2 ring-primary" : ""}>
                 {highlight && (
