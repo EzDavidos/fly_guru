@@ -114,19 +114,23 @@ export function BookingCreateForm({
         </select>
       </label>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs text-muted">
+      {/* min-w-0 у ячеек: у нативных date/time своя минимальная ширина, а ячейка
+          грида по умолчанию не даёт себя ужать (min-width: auto) — на телефоне
+          дата распирала колонку и наезжала на время. items-end держит поля на
+          одной линии, даже если подпись переносится на вторую строку. */}
+      <div className="grid grid-cols-2 items-end gap-2">
+        <label className="min-w-0 text-xs text-muted">
           Дата (можно будущую)
           <input
             type="date"
             name="preferredDate"
             defaultValue={today}
-            className={`mt-1 ${inputClass}`}
+            className={`mt-1 min-w-0 ${inputClass}`}
           />
         </label>
-        <label className="text-xs text-muted">
+        <label className="min-w-0 text-xs text-muted">
           Время
-          <input type="time" name="scheduledTime" className={`mt-1 ${inputClass}`} />
+          <input type="time" name="scheduledTime" className={`mt-1 min-w-0 ${inputClass}`} />
         </label>
       </div>
 
