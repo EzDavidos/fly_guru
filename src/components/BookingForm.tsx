@@ -102,7 +102,7 @@ export function BookingForm({ services, defaultServiceId, refCode, onSuccess }: 
 
       <div>
         <label htmlFor="clientName" className="mb-1 block text-sm font-medium">
-          Имя *
+          Имя <span className="text-red-600">*</span>
         </label>
         <input id="clientName" name="clientName" type="text" required className={inputClass} />
       </div>
@@ -112,7 +112,7 @@ export function BookingForm({ services, defaultServiceId, refCode, onSuccess }: 
           это удавалось только вручную. */}
       <div>
         <label htmlFor="contact" className="mb-1 block text-sm font-medium">
-          Телефон *
+          Телефон <span className="text-red-600">*</span>
         </label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -136,9 +136,6 @@ export function BookingForm({ services, defaultServiceId, refCode, onSuccess }: 
             ))}
           </select>
         </div>
-        <p className="mt-1 text-sm text-muted">
-          Номер для WhatsApp или Telegram — по нему свяжемся с вами.
-        </p>
         {phoneBad && <p className="mt-1 text-sm text-red-600">{PHONE_ERROR}</p>}
       </div>
 
@@ -155,8 +152,10 @@ export function BookingForm({ services, defaultServiceId, refCode, onSuccess }: 
           placeholder="@username"
           className={inputClass}
         />
-        <p className="mt-1 text-sm text-muted">
-          Необязательно — если номер не отвечает, напишем сюда.
+        {/* Одной строкой даже на узком телефоне — отсюда короткий текст и
+            whitespace-nowrap с чуть меньшим кеглем (пачка №5, п.2). */}
+        <p className="mt-1 whitespace-nowrap text-xs text-muted sm:text-sm">
+          Необязательно — запасной способ связи
         </p>
       </div>
 

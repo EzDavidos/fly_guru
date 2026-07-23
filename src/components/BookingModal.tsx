@@ -62,11 +62,10 @@ export function BookingModal({
         </button>
 
         <h2 className="text-2xl font-bold">Запись</h2>
-        <p className="mt-1 text-sm text-muted">
-          Оставьте контакт — свяжемся и подтвердим время.
-        </p>
 
-        <div className="mt-6">
+        {/* Без подзаголовка: первым делом гость должен видеть поле «Имя», а не
+            ещё одну строку текста (пачка №5, п.2). */}
+        <div className="mt-4">
           <BookingForm
             services={services}
             defaultServiceId={defaultServiceId}
