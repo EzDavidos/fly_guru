@@ -127,8 +127,7 @@ export default function HomePage() {
             <div>
               <h2 className="text-2xl font-bold sm:text-3xl">Продаём электрофойлы</h2>
               <p className="mt-3 text-muted">
-                {/* TODO: перечислить бренды, которые продаёте */}
-                Официально возим и продаём электрофойлы брендов [TODO: бренды].
+                Официально возим и продаём электрофойлы Hobbywing и Lift Foils.
                 Поможем выбрать под ваш вес и уровень, расскажем про обслуживание.
               </p>
               <div className="mt-6">

@@ -12,7 +12,7 @@ export default function ShopPage() {
         <SectionHeading
           eyebrow="Магазин"
           title="Электрофойлы в продаже"
-          subtitle="Каталог скоро появится. Пока по вопросам покупки — свяжитесь с нами в контактах."
+          subtitle="Возим и продаём Hobbywing и Lift Foils. Каталог с ценами скоро появится — пока по вопросам покупки пишите нам в контактах."
         />
       </Container>
     </Section>
