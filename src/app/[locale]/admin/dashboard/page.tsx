@@ -404,10 +404,12 @@ export default async function AdminDashboardPage({
         </Link>
       </div>
 
-      {/* Два компактных поля дат (по ширине почти как текст в них) стоят рядом
-          и по центру, кнопка «Показать» — под ними. Без w-full/flex-1, иначе
-          нативный датапикер растягивается и вылезает за экран. */}
-      <form className="mt-3 flex flex-col items-center gap-3" action="">
+      {/* Два компактных поля дат стоят рядом, кнопка «Показать» — под ними во
+          всю их ширину. w-fit прижимает весь блок к левому краю, в одну линию
+          с кнопками «Этот месяц» сверху и «Все услуги» снизу (пачка №5, п.8).
+          Сами поля без w-full/flex-1, иначе нативный датапикер растягивается
+          и вылезает за экран. */}
+      <form className="mt-3 flex w-fit flex-col gap-3" action="">
         {cat && <input type="hidden" name="cat" value={cat} />}
         {inst && <input type="hidden" name="inst" value={inst} />}
         <div className="flex items-end gap-2">
@@ -434,7 +436,7 @@ export default async function AdminDashboardPage({
         </div>
         <button
           type="submit"
-          className="rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+          className="w-full rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
         >
           Показать
         </button>

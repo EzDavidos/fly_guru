@@ -100,10 +100,11 @@ export default async function StatsPage({
         </Link>
       </div>
 
-      {/* Два компактных поля дат (по ширине почти как текст в них) стоят рядом
-          и по центру, кнопка «Показать» — под ними. Без w-full/flex-1, иначе
-          нативный датапикер растягивается и вылезает за экран. */}
-      <form className="mt-3 flex flex-col items-center gap-3" action="">
+      {/* Два компактных поля дат стоят рядом, кнопка «Показать» — под ними во
+          всю их ширину. w-fit прижимает весь блок к левому краю, в одну линию
+          с кнопками пресетов сверху (пачка №5, п.8). Сами поля без w-full/
+          flex-1, иначе нативный датапикер вылезает за экран. */}
+      <form className="mt-3 flex w-fit flex-col gap-3" action="">
         <div className="flex items-end gap-2">
           <label className="flex flex-col items-start text-xs text-muted">
             С
@@ -128,7 +129,7 @@ export default async function StatsPage({
         </div>
         <button
           type="submit"
-          className="rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+          className="w-full rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
         >
           Показать
         </button>
