@@ -185,16 +185,30 @@ function AgentCard({
             today={today}
           />
 
+          {/* Отданные деньги — зелёными плашками, как «💵 Оплата» в сессиях и
+              заявках. Раньше вся история была мелким серым по серому, и суммы
+              в ней просто терялись. */}
           {payouts.length > 0 && (
             <div className="mt-3 border-t border-line/70 pt-2">
-              <p className="text-xs font-semibold text-muted">История выплат</p>
-              <ul className="mt-1 space-y-1 text-xs text-muted">
+              <p className="text-xs font-semibold text-ink">История выплат</p>
+              <ul className="mt-2 space-y-2">
                 {payouts.map((p) => (
-                  <li key={p.id} className="flex items-center gap-2">
+                  <li
+                    key={p.id}
+                    className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2"
+                  >
+                    <span aria-hidden className="text-sm leading-5">
+                      💵
+                    </span>
                     <span className="min-w-0 flex-1">
-                      {fmtDay(p.paid_on)} · {vnd(p.amount)}
-                      {p.method?.name ? ` · ${p.method.name}` : ""}
-                      {p.comment ? ` — ${p.comment}` : ""}
+                      <span className="block text-sm font-bold text-emerald-600">
+                        {vnd(p.amount)}
+                      </span>
+                      <span className="block text-xs text-muted">
+                        {fmtDay(p.paid_on)}
+                        {p.method?.name ? ` · ${p.method.name}` : ""}
+                        {p.comment ? ` · ${p.comment}` : ""}
+                      </span>
                     </span>
                     <form action={deleteAgentPayoutAction}>
                       <input type="hidden" name="id" value={p.id} />
