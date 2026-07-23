@@ -24,6 +24,17 @@ export const DICT_LABEL: Record<DictTable, string> = {
   payment_methods: "формат оплаты",
 };
 
+// Имя способа оплаты из встроенного запроса `payment:payment_methods(name)`.
+// Связь у заявки к одному, но типы supabase-js описывают вложенную выборку
+// массивом — разворачиваем в одном месте, чтобы не сыпать приведениями по
+// страницам. Нужно там, где способ мог быть скрыт в справочнике: select в форме
+// не нашёл бы своего значения, и его надо дорисовать запасным пунктом.
+export function embeddedName(value: unknown): string | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  const name = (row as { name?: unknown } | null | undefined)?.name;
+  return typeof name === "string" ? name : null;
+}
+
 // Только видимые позиции — для форм.
 export async function getActiveDict(
   supabase: Supabase,
