@@ -7,6 +7,7 @@ import { ConfirmSubmit } from "../ConfirmSubmit";
 import { SaveForm } from "../SaveForm";
 import { getActiveDict } from "@/lib/dictionaries";
 import { SessionCreateForm } from "./SessionCreateForm";
+import { NATIVE_PICKER } from "@/components/cabinet/fieldClasses";
 
 export const metadata: Metadata = { title: "Админка · Сессии" };
 
@@ -31,6 +32,10 @@ interface SessionRow {
 
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
+
+// То же поле, но естественной ширины — для фильтра периода (как в Статистике).
+const dayInputClass =
+  "rounded-xl border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-primary";
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -91,17 +96,19 @@ function SessionCard({
 
       <SaveForm action={updateSessionAction} className="border-t border-line/70 p-4 pt-3">
         <input type="hidden" name="id" value={s.id} />
-        <div className="grid grid-cols-2 gap-2">
-          <label className="text-xs text-muted">
+        {/* min-w-0 + items-end: нативный датапикер распирал свою колонку и
+            наезжал на «Инструктора» (см. NATIVE_PICKER). */}
+        <div className="grid grid-cols-2 items-end gap-2">
+          <label className="min-w-0 text-xs text-muted">
             Дата
             <input
               type="date"
               name="date"
               defaultValue={s.date}
-              className={`mt-1 ${inputClass}`}
+              className={`mt-1 ${NATIVE_PICKER} ${inputClass}`}
             />
           </label>
-          <label className="text-xs text-muted">
+          <label className="min-w-0 text-xs text-muted">
             Инструктор
             {/* Пустое значение = «не трогать поле» (см. updateSessionAction).
                 Подпись честно об этом говорит: раньше тут было «—», и выбор
@@ -285,29 +292,39 @@ export default async function AdminSessionsPage({
         </div>
       </details>
 
-      {/* Фильтр по периоду (GET — страница серверная) */}
-      <form className="mt-4 flex items-end gap-2">
-        <label className="flex-1 text-xs text-muted">
-          С
-          <input
-            type="date"
-            name="from"
-            defaultValue={fromDay}
-            className={`mt-1 ${inputClass}`}
-          />
-        </label>
-        <label className="flex-1 text-xs text-muted">
-          По
-          <input
-            type="date"
-            name="to"
-            defaultValue={toInclusive}
-            className={`mt-1 ${inputClass}`}
-          />
-        </label>
+      {/* Фильтр по периоду (GET — страница серверная). Раскладка как в
+          Статистике: два компактных поля рядом, кнопка под ними во всю их
+          ширину, весь блок прижат влево (w-fit). Поля БЕЗ w-full/flex-1 —
+          растянутый нативный датапикер ломал ряд на телефоне. max={today}
+          нужен не только по смыслу (занятий в будущем не бывает): без верхней
+          границы Chrome резервирует в поле место под пятизначный год, и пара
+          дат перестаёт влезать в узкий экран. */}
+      <form className="mt-4 flex w-fit flex-col gap-3">
+        <div className="flex items-end gap-2">
+          <label className="flex flex-col items-start text-xs text-muted">
+            С
+            <input
+              type="date"
+              name="from"
+              defaultValue={fromDay}
+              max={today}
+              className={`mt-1 ${NATIVE_PICKER} ${dayInputClass}`}
+            />
+          </label>
+          <label className="flex flex-col items-start text-xs text-muted">
+            По
+            <input
+              type="date"
+              name="to"
+              defaultValue={toInclusive}
+              max={today}
+              className={`mt-1 ${NATIVE_PICKER} ${dayInputClass}`}
+            />
+          </label>
+        </div>
         <button
           type="submit"
-          className="rounded-full border border-line px-4 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+          className="w-full rounded-full border border-line px-4 py-2 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
         >
           Показать
         </button>
