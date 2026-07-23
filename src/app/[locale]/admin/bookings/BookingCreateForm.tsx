@@ -33,12 +33,17 @@ export function BookingCreateForm({
 
   if (!open) {
     return (
+      // Кнопка-CTA: заводить заявки руками приходится каждый день, а пунктирная
+      // серая рамка читалась как заглушка — её просто не замечали.
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-2xl border border-dashed border-line px-4 py-3 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+        className="w-full rounded-2xl bg-accent px-4 py-3 text-center text-white shadow-sm transition-colors hover:bg-accent-strong"
       >
-        + Новая заявка (звонок, мессенджер, пришёл сам)
+        <span className="block text-base font-bold">+ Новая заявка</span>
+        <span className="mt-0.5 block text-xs font-medium text-white/80">
+          звонок · мессенджер · пришёл сам
+        </span>
       </button>
     );
   }
