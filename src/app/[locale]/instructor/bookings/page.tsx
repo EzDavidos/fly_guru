@@ -6,7 +6,9 @@ import { acceptBookingAction, declineBookingAction } from "../actions";
 
 // «Записи»: заявки, которые админ подтвердил (созвонился, внёс время/возраст/
 // вес). Закреплённые админом — сверху. Любой инструктор может принять запись;
-// принятую видно всем, но кнопка «Оформить» — только у принявшего.
+// после того как её приняли, оформить занятие может ЛЮБОЙ инструктор (мало ли,
+// катает другой) — «Принял: X» лишь показывает, кто координирует. Вернуть
+// запись в общий пул кнопкой «Отказаться» может только принявший.
 
 interface BookingRow {
   id: string;
@@ -74,14 +76,13 @@ export default async function InstructorBookingsPage() {
       <div className="mt-6 space-y-3">
         {bookings.map((b) => {
           const mine = b.accepted_by === user.id;
-          const takenByOther = Boolean(b.accepted_by) && !mine;
 
           return (
             <div
               key={b.id}
               className={`rounded-2xl border bg-surface p-4 ${
                 b.pinned ? "border-accent" : "border-line"
-              } ${takenByOther ? "opacity-60" : ""}`}
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -133,34 +134,38 @@ export default async function InstructorBookingsPage() {
                 </form>
               )}
 
-              {mine && (
-                <div className="mt-3 flex gap-2">
-                  <Link
-                    href={
-                      b.services?.category === "subscription"
-                        ? `/instructor/subscription?booking=${b.id}`
-                        : `/instructor/record?booking=${b.id}`
-                    }
-                    className={`${actionButton} bg-accent text-white hover:bg-accent-strong`}
-                  >
-                    {b.services?.category === "subscription" ? "Продать абонемент" : "Записать клиента"}
-                  </Link>
-                  <form action={declineBookingAction} className="shrink-0">
-                    <input type="hidden" name="id" value={b.id} />
-                    <button
-                      type="submit"
-                      className="rounded-full border border-line px-4 py-3 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+              {/* Принята — оформить может любой инструктор. «Отказаться»
+                  (вернуть в общий пул) оставляем только принявшему. */}
+              {b.accepted_by && (
+                <>
+                  <div className="mt-3 flex gap-2">
+                    <Link
+                      href={
+                        b.services?.category === "subscription"
+                          ? `/instructor/subscription?booking=${b.id}`
+                          : `/instructor/record?booking=${b.id}`
+                      }
+                      className={`${actionButton} bg-accent text-white hover:bg-accent-strong`}
                     >
-                      Отказаться
-                    </button>
-                  </form>
-                </div>
-              )}
+                      {b.services?.category === "subscription" ? "Продать абонемент" : "Записать клиента"}
+                    </Link>
+                    {mine && (
+                      <form action={declineBookingAction} className="shrink-0">
+                        <input type="hidden" name="id" value={b.id} />
+                        <button
+                          type="submit"
+                          className="rounded-full border border-line px-4 py-3 text-sm font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+                        >
+                          Отказаться
+                        </button>
+                      </form>
+                    )}
+                  </div>
 
-              {takenByOther && (
-                <p className="mt-3 text-sm font-semibold text-muted">
-                  Принял: {b.accepted?.name ?? "другой инструктор"}
-                </p>
+                  <p className="mt-2 text-sm font-semibold text-muted">
+                    Принял: {mine ? "вы" : b.accepted?.name ?? "другой инструктор"}
+                  </p>
+                </>
               )}
             </div>
           );
