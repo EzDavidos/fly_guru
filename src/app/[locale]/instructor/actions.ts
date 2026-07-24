@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getAppUser, type AppUser } from "@/lib/auth";
+import { getAppUser, ROLE_HOME, type AppUser } from "@/lib/auth";
 import {
   phoneDigits,
   phonesMatch,
@@ -519,7 +519,7 @@ export async function updateProfileAction(
 
   // Имя и фото видны на главном экране кабинета и в бейдже шапки.
   revalidatePath("/", "layout");
-  redirect("/instructor");
+  redirect(ROLE_HOME[user.role]);
 }
 
 // ── Личная реф-ссылка инструктора (пак C) ─────────────────────────────────────
