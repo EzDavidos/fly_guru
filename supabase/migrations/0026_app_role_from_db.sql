@@ -24,7 +24,10 @@ returns text
 language sql stable security definer
 set search_path = public
 as $$
-  select coalesce((select role from users where auth_id = auth.uid()), '')
+  -- role — это enum user_role, поэтому приводим к тексту: иначе coalesce
+  -- пытается подставить '' как значение енама и падает (22P02). Вызывающий код
+  -- всё равно сравнивает роль как строку ('admin'/'instructor').
+  select coalesce((select role::text from users where auth_id = auth.uid()), '')
 $$;
 
 grant execute on function public.app_role() to authenticated;
